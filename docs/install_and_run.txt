@@ -1,0 +1,9 @@
+-- install
+
+pip install pretty_midi mido numpy
+pip install fluidsynth
+
+
+-- run
+
+python main.py
