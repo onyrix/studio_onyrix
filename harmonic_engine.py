@@ -2,11 +2,20 @@ import pretty_midi
 import random
 from utils import *
 from style_engine import get_style_progression
+from harmony_engine import (
+    get_chord_for_degree, 
+    get_functional_progression,
+    voice_lead_satb,
+    position_chord_satb,
+    STANDARD_VOICE_RANGES,
+    INSTRUMENT_VOICE_RANGES
+)
 
 
 def voice_lead(prev, next_c):
     """
     Voice leading: find the closest inversion for smooth chord transitions.
+    Uses the advanced SATB voice leading from harmony_engine.
     
     Args:
         prev: Previous chord notes
@@ -16,62 +25,26 @@ def voice_lead(prev, next_c):
         list: Voiced chord notes
     """
     if not prev:
-        return next_c
-
-    out = []
-    for n in next_c:
-        opts = [n-12, n, n+12]
-        best = min(opts, key=lambda x: min(abs(x-p) for p in prev))
-        out.append(best)
-    return out
+        return position_chord_satb(next_c, INSTRUMENT_VOICE_RANGES)
+    
+    return voice_lead_satb(prev, next_c, INSTRUMENT_VOICE_RANGES)
 
 
-def build_complex_chord(scale, degree, complexity):
+def build_complex_chord(scale_name, degree, complexity):
     """
-    Build a chord with complexity based on the style.
+    Build a chord with correct quality and complexity based on the style.
+    Uses the advanced harmony engine for proper chord construction.
     
     Args:
-        scale: The scale notes
+        scale_name: Name of the scale (e.g., "C_major")
         degree: Scale degree (0-6)
         complexity: 0.0-1.0, where 0=triad, 1=extended chords
     
     Returns:
-        list: Chord notes
+        list: Chord notes with correct quality
     """
-    # Basic triad
-    chord = [scale[degree % 7], scale[(degree + 2) % 7], scale[(degree + 4) % 7]]
-    
-    if complexity < 0.3:
-        # Just triads
-        return chord
-    
-    # Add 7th
-    if complexity >= 0.3:
-        seventh = scale[(degree + 6) % 7]
-        chord.append(seventh)
-    
-    # Add 9th, 11th, 13th for higher complexity
-    if complexity >= 0.6:
-        ninth = scale[(degree + 8) % 7] + 12  # 9th is one octave + 2
-        chord.append(ninth)
-    
-    if complexity >= 0.8:
-        # Add extensions or alterations
-        if random.random() < 0.5:
-            # Add 11th
-            eleventh = scale[(degree + 10) % 7] + 12
-            chord.append(eleventh)
-        else:
-            # Add 13th
-            thirteenth = scale[(degree + 12) % 7] + 12
-            chord.append(thirteenth)
-    
-    if complexity >= 0.9 and random.random() < 0.3:
-        # Add alterations (b9, #9, b5, #5)
-        alteration = random.choice([-1, 1])
-        chord = [n + alteration if random.random() < 0.3 else n for n in chord]
-    
-    return chord
+    # Use the advanced harmony engine for proper chord construction
+    return get_chord_for_degree(scale_name, degree, complexity, octave=4)
 
 
 def generate_chords(pm, spec, section, t0):
@@ -110,17 +83,36 @@ def generate_chords(pm, spec, section, t0):
 
     chords = build_chords(scale)
     
-    # Select progression - use style-specific if available
+    # Select progression - use style-specific functional progressions
     chaos = spec["chaos"]["level"]
+    style_name = spec["identity"].get("style", "")
     
     if typical_progressions and random.random() > chaos * 0.5:
-        # Use style-typical progression
+        # Use style-typical functional progression
+        progression_degrees = get_functional_progression(style_name, section["bars"])
+        # Build chords with correct quality
+        prog = []
+        for degree in progression_degrees:
+            chord = get_chord_for_degree(
+                spec["identity"]["key"], 
+                degree, 
+                chord_complexity
+            )
+            prog.append(chord)
+    elif typical_progressions:
         progression_degrees = get_style_progression(
             spec["identity"].get("style", ""), 
             chaos * 0.3
         )
         if progression_degrees:
-            prog = [chords[i % 7] for i in progression_degrees]
+            prog = []
+            for degree in progression_degrees:
+                chord = get_chord_for_degree(
+                    spec["identity"]["key"],
+                    degree,
+                    chord_complexity
+                )
+                prog.append(chord)
         else:
             prog = select_progression(chords, chaos)
     else:
@@ -130,16 +122,15 @@ def generate_chords(pm, spec, section, t0):
     prev = None
 
     for i in range(section["bars"]):
-        # Build chord with appropriate complexity
+        # Get chord for this bar
         degree = i % len(prog)
         base_chord = prog[degree]
         
-        # Apply complexity to build richer chords
-        if chord_complexity > 0.3:
-            chord_degree = degree % 7
-            chord = build_complex_chord(scale, chord_degree, chord_complexity)
-        else:
+        # Apply voice leading for smooth transitions
+        if prev:
             chord = voice_lead(prev, base_chord)
+        else:
+            chord = position_chord_satb(base_chord, INSTRUMENT_VOICE_RANGES)
         
         t = t0 + i * bar
         

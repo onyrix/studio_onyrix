@@ -68,19 +68,24 @@ def get_drum_config(style_name):
 
 
 def apply_humanization(time, velocity, config, step_duration):
-    """Apply timing and velocity humanization to a note."""
+    """Apply timing and velocity humanization to a note.
+    For drums, velocity jitter is minimal to maintain audibility."""
     human = config.get("humanization", {})
     timing_jitter = human.get("timing_jitter", 0.0)
     velocity_jitter = human.get("velocity_jitter", 0.0)
     
-    # Apply timing jitter
+    # Apply timing jitter (keep this)
     if timing_jitter > 0:
         time += random.uniform(-timing_jitter, timing_jitter) * step_duration
     
-    # Apply velocity jitter
+    # Apply MINIMAL velocity jitter for drums (preserve audibility)
     if velocity_jitter > 0:
-        jitter_range = int(velocity * velocity_jitter)
-        velocity = max(1, min(127, velocity + random.randint(-jitter_range, jitter_range)))
+        # Very small jitter range for drums (±5 max)
+        jitter_range = min(5, int(velocity * 0.1))  # Max 10% or 5
+        velocity = max(60, min(127, velocity + random.randint(-jitter_range, jitter_range)))
+    else:
+        # No jitter, just ensure minimum
+        velocity = max(60, min(127, velocity))
     
     return time, velocity
 
@@ -113,9 +118,35 @@ def get_patterns_for_section(config, section_type):
     return section_vars.get("default", {}).get("use_patterns", ["basic"])
 
 
+# Pattern key aliases (human-friendly -> DRUM_NOTES keys)
+PATTERN_KEY_ALIASES = {
+    "hihat": "hihat_closed",
+    "hihat_closed": "hihat_closed",
+    "hihat_open": "hihat_open",
+    "kick": "kick",
+    "snare": "snare",
+    "clap": "clap",
+    "crash": "crash",
+    "ride": "ride",
+    "tom_high": "tom_high",
+    "tom_mid": "tom_mid",
+    "tom_low": "tom_low",
+    "cowbell": "cowbell",
+    "click": "click",
+}
+
+
+def resolve_pattern_voice(voice_name):
+    """Resolve a pattern voice name to a DRUM_NOTES key."""
+    if voice_name in DRUM_NOTES:
+        return voice_name
+    return PATTERN_KEY_ALIASES.get(voice_name)
+
+
 def generate_drums(pm, spec, section, t0):
     """
     Generate drum patterns based on style configurations.
+    Enhanced version with proper pattern key resolution and stronger velocities.
     
     Args:
         pm: PrettyMIDI object
@@ -149,10 +180,10 @@ def generate_drums(pm, spec, section, t0):
     density_modifier = get_section_density_modifier(drum_config, section_type)
     available_patterns = get_patterns_for_section(drum_config, section_type)
     
-    # Calculate effective density
+    # Calculate effective density - ensure drums are always audible
     base_density = spec.get("style_params", {}).get("drum_density", 0.7)
-    effective_density = base_density * density_modifier * (0.5 + intensity * 0.5)
-    effective_density = min(1.0, effective_density)
+    effective_density = base_density * density_modifier * (0.7 + intensity * 0.3)
+    effective_density = min(1.0, max(0.5, effective_density))  # At least 0.5 density
     
     kicks = []
     current_pattern_name = "basic"
@@ -188,7 +219,9 @@ def generate_drums(pm, spec, section, t0):
             
             # Process each drum voice in the pattern
             for voice_name, voice_pattern in pattern.items():
-                if voice_name not in DRUM_NOTES:
+                # Resolve voice name to DRUM_NOTES key
+                resolved_voice = resolve_pattern_voice(voice_name)
+                if resolved_voice is None or resolved_voice not in DRUM_NOTES:
                     continue
                 
                 if step_in_bar < len(voice_pattern) and voice_pattern[step_in_bar]:
@@ -196,33 +229,52 @@ def generate_drums(pm, spec, section, t0):
                     if random.random() > effective_density:
                         continue
                     
-                    # Get velocity for this voice
-                    vel_key = f"{voice_name}_base"
-                    base_vel = velocities.get(vel_key, 80)
+                    # Get base velocity for this voice - VERY STRONG
+                    vel_key = f"{resolved_voice}_base"
+                    base_vel = velocities.get(vel_key, 90)
                     
-                    # Check if this is a ghost note (pattern value < 100)
-                    pattern_val = voice_pattern[step_in_bar]
-                    is_ghost = isinstance(pattern_val, (int, float)) and pattern_val < 100 and pattern_val > 0
+                    # For drums, ALWAYS use base_vel as minimum (pattern value 1 = trigger)
+                    # This ensures loud, audible drums
+                    vel = base_vel
                     
-                    if is_ghost:
-                        vel = pattern_val
+                    # Add small random variation
+                    variation = random.randint(-5, 5)
+                    vel = vel + variation
+                    
+                    # Apply intensity multiplier for THIS instrument type
+                    if "kick" in resolved_voice:
+                        vel = int(vel * (1.0 + intensity * 0.5))  # Kick: VERY LOUD
+                        vel = max(110, min(127, vel))  # Kick at least 110
+                    elif "snare" in resolved_voice or "clap" in resolved_voice:
+                        vel = int(vel * (0.9 + intensity * 0.4))
+                        vel = max(100, min(127, vel))  # Snare at least 100
+                    elif "hihat" in resolved_voice:
+                        vel = int(vel * (0.8 + intensity * 0.3))
+                        vel = max(80, min(127, vel))  # Hihat at least 80
                     else:
-                        # Apply intensity and variation
-                        vel_range = velocities.get("hihat_variation", 20) if "hihat" in voice_name else 0
-                        vel = base_vel + random.randint(-vel_range, vel_range)
-                        vel = int(vel * (0.7 + intensity * 0.3))
+                        vel = int(vel * (0.9 + intensity * 0.3))
+                        vel = max(90, min(127, vel))  # Others at least 90
                     
-                    # Apply humanization
+                    # Apply minimal humanization (preserve velocity)
                     t_final, vel_final = apply_humanization(t, int(vel), drum_config, step_duration)
-                    vel_final = max(1, min(127, vel_final))
+                    # Final safety: ensure VERY audible (minimum 60, but instrument-specific minimum already applied)
+                    vel_final = max(vel_final, 60)
                     
                     # Add note
-                    note_duration = step_duration * 0.8  # Slightly shorter than step
-                    inst.notes.append(pretty_midi.Note(vel_final, DRUM_NOTES[voice_name], t_final, t_final + note_duration))
+                    note_duration = step_duration * 0.9  # Slightly shorter than step
+                    inst.notes.append(pretty_midi.Note(vel_final, DRUM_NOTES[resolved_voice], t_final, t_final + note_duration))
                     
                     # Track kick times
-                    if voice_name == "kick":
+                    if resolved_voice == "kick":
                         kicks.append(t_final)
+    
+    # Fallback: if no drum notes were generated, add a basic kick pattern
+    if len(inst.notes) == 0:
+        print("Warning: No drum notes generated, adding fallback kick pattern")
+        for bar in range(total_bars):
+            for beat in [0, 2]:  # Kick on beats 1 and 3
+                t = t0 + (bar * steps_per_bar + beat * 4) * step_duration
+                inst.notes.append(pretty_midi.Note(100, DRUM_NOTES["kick"], t, t + step_duration * 0.9))
     
     pm.instruments.append(inst)
     end_time = t0 + total_steps * step_duration
@@ -258,43 +310,44 @@ def get_chord_tones(chord_notes, root_midi):
     return intervals
 
 
-def select_bass_note(chord_notes, scale_notes, config, step_index, intensity):
+def select_bass_note(root_note_class, chord_notes, scale_notes, config, step_index, intensity):
     """
     Select a bass note based on music theory and style configuration.
     
     Args:
-        chord_notes: Current chord notes
+        root_note_class: Root note class (0-11, where 0=C)
+        chord_notes: Current chord notes (for determining chord tones)
         scale_notes: Scale notes for the key
         config: Bass theory configuration
         step_index: Position in the pattern (for variation)
         intensity: Section intensity (0-1)
     
     Returns:
-        int: MIDI note number for bass
+        int: MIDI note number for bass (in bass range C1-C3)
     """
     approach = config.get("approach", "simple")
     preferences = config.get("scale_preference", ["root", "fifth", "octave"])
     syncopation = config.get("syncopation", 0.3)
     octave_range = config.get("octave_range", (1, 2))
     
-    # Get root from chord (lowest note)
-    root_midi = min(chord_notes) if chord_notes else scale_notes[0]
-    root_note = root_midi % 12
-    
     # Determine which intervals to use based on approach
     available_intervals = []
     
     if approach in ["chord_tones", "simple", "four_on_floor", "driving"]:
-        # Prefer chord tones
-        chord_intervals = get_chord_tones(chord_notes, root_midi)
-        for pref in preferences:
-            if pref in INTERVAL_MAP:
-                interval = INTERVAL_MAP[pref] % 12
-                if interval in chord_intervals:
-                    available_intervals.append(INTERVAL_MAP[pref])
-        # Fallback to any chord tone
-        if not available_intervals:
-            available_intervals = [i if i < 12 else i - 12 for i in chord_intervals]
+        # Prefer chord tones - extract intervals from chord
+        if chord_notes:
+            chord_root = min(chord_notes)
+            chord_intervals = get_chord_tones(chord_notes, chord_root)
+            for pref in preferences:
+                if pref in INTERVAL_MAP:
+                    interval = INTERVAL_MAP[pref] % 12
+                    if interval in chord_intervals:
+                        available_intervals.append(INTERVAL_MAP[pref])
+            # Fallback to any chord tone
+            if not available_intervals:
+                available_intervals = [i if i < 12 else i - 12 for i in chord_intervals]
+        else:
+            available_intervals = [INTERVAL_MAP.get(p, 0) for p in preferences]
     
     elif approach == "walking":
         # Use scale tones with approach patterns
@@ -304,10 +357,12 @@ def select_bass_note(chord_notes, scale_notes, config, step_index, intensity):
     
     elif approach in ["groovy", "funky", "slap"]:
         # Mix of chord tones and approach notes
-        chord_intervals = get_chord_tones(chord_notes, root_midi)
-        for pref in preferences:
-            if pref in INTERVAL_MAP:
-                available_intervals.append(INTERVAL_MAP[pref])
+        if chord_notes:
+            chord_root = min(chord_notes)
+            chord_intervals = get_chord_tones(chord_notes, chord_root)
+            for pref in preferences:
+                if pref in INTERVAL_MAP:
+                    available_intervals.append(INTERVAL_MAP[pref])
         # Add some chromatic approach notes
         if random.random() < syncopation * intensity:
             available_intervals.append(random.choice([1, 6, 10]))
@@ -326,8 +381,12 @@ def select_bass_note(chord_notes, scale_notes, config, step_index, intensity):
     
     elif approach == "arpeggiated":
         # Arpeggio patterns
-        chord_intervals = get_chord_tones(chord_notes, root_midi)
-        available_intervals = sorted(chord_intervals + [i + 12 for i in chord_intervals])
+        if chord_notes:
+            chord_root = min(chord_notes)
+            chord_intervals = get_chord_tones(chord_notes, chord_root)
+            available_intervals = sorted(chord_intervals + [i + 12 for i in chord_intervals])
+        else:
+            available_intervals = [0, 12]
     
     elif approach in ["experimental", "glitchy"]:
         # More dissonant intervals
@@ -342,14 +401,17 @@ def select_bass_note(chord_notes, scale_notes, config, step_index, intensity):
     
     selected_interval = random.choice(available_intervals)
     
-    # Determine octave
+    # Determine octave (1 = C2, 2 = C3, etc.)
     octave = random.randint(octave_range[0], octave_range[1])
     
-    # Calculate final note
-    bass_note = root_midi + selected_interval + (octave - 1) * 12
+    # Calculate final note in bass range
+    # root_note_class is 0-11 (C=0, C#=1, etc.)
+    # octave 1 = C1 (36), octave 2 = C2 (48), octave 3 = C3 (60)
+    # Formula: root_note_class + (octave * 12) + 24 = starts at C1=36
+    bass_note = root_note_class + (octave * 12) + 24 + selected_interval
     
-    # Clamp to reasonable bass range (C0 to C4)
-    bass_note = max(24, min(84, bass_note))
+    # Clamp to reasonable bass range (C1 to C3)
+    bass_note = max(36, min(60, bass_note))
     
     return bass_note
 
@@ -365,6 +427,7 @@ def get_note_duration(config, step_duration):
 def generate_bass(pm, spec, section, t0, kicks, current_chords=None):
     """
     Generate bass lines based on style configurations and music theory.
+    Enhanced version with stronger velocities and better drum synchronization.
     
     Args:
         pm: PrettyMIDI object
@@ -386,9 +449,11 @@ def generate_bass(pm, spec, section, t0, kicks, current_chords=None):
     scale_type = spec.get("identity", {}).get("scale_type", "natural_minor")
     scale_notes = get_scale_notes(key, scale_type)
     
-    # Get root MIDI note (bass octave)
+    # Get root MIDI note (bass octave) - ensure proper bass range
     root_key = key.split("_")[0]
-    root_midi = NOTE_MAP.get(root_key, 48)  # C2 = 48
+    root_note_class = NOTE_MAP.get(root_key, 48)  # C = 48 (C4)
+    # Put in bass range (C1-C2 typically): C1=36, C2=48
+    root_midi = (root_note_class % 12) + 36  # Base: C1 = 36
     
     # Select bass instrument (with random alternative if available)
     style_instruments = spec.get("style_params", {}).get("instruments", {})
@@ -464,43 +529,46 @@ def generate_bass(pm, spec, section, t0, kicks, current_chords=None):
             note_time = bar_start + pos
             
             # Select note based on music theory
-            note = select_bass_note(chord, scale_notes, bass_config, i, intensity)
+            # Get root note class from the chord's root
+            chord_root = min(chord) % 12 if chord else root_note_class
+            note = select_bass_note(chord_root, chord, scale_notes, bass_config, i, intensity)
             
             # Apply approach patterns
             approach_patterns = bass_config.get("approach_patterns", ["direct"])
             if random.random() < 0.3 and i > 0:
                 pattern = random.choice(approach_patterns)
                 if pattern == "chromatic_below":
-                    note = note - 1
+                    note = max(36, note - 1)  # Don't go below C1
                 elif pattern == "chromatic_above":
-                    note = note + 1
+                    note = min(60, note + 1)  # Don't go above C3
                 elif pattern == "diatonic_below":
-                    note = note - 2
+                    note = max(36, note - 2)
                 elif pattern == "diatonic_above":
-                    note = note + 2
+                    note = min(60, note + 2)
                 elif pattern == "octave_leap":
-                    note = note + 12 * random.choice([-1, 1])
+                    leap = note + 12 * random.choice([-1, 1])
+                    note = max(36, min(60, leap))  # Keep in bass range
                 elif pattern == "slide":
                     # Slide is handled by note duration overlap
                     pass
             
-            # Calculate velocity based on position and intensity
+            # Calculate velocity based on position and intensity - STRONGER
             is_strong_beat = (pos / step_duration) % 4 == 0
-            base_velocity = 80 + int(30 * intensity)
+            base_velocity = 100 + int(30 * intensity)  # Even higher base velocity
             if is_strong_beat:
-                velocity = base_velocity + 10
+                velocity = base_velocity + 20
             else:
-                velocity = base_velocity - 10
+                velocity = base_velocity
             
             # Add variation
-            velocity += random.randint(-15, 15)
-            velocity = max(30, min(120, velocity))
+            velocity += random.randint(-5, 5)  # Less variation to maintain audibility
+            velocity = max(80, min(127, velocity))  # Higher minimum (80) for audibility
             
-            # Calculate duration
+            # Calculate duration - longer notes for better audibility
             if i < len(note_positions) - 1:
-                duration = (note_positions[i + 1] - pos) * 0.8
+                duration = (note_positions[i + 1] - pos) * 0.95  # Slightly longer
             else:
-                duration = get_note_duration(bass_config, step_duration)
+                duration = get_note_duration(bass_config, step_duration) * 1.5  # Longer sustain
             
             # Ensure notes don't overlap unnaturally (except for slides)
             if prev_note and note_time < prev_note[0] + prev_note[1]:
