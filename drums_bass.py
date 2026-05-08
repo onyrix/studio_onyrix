@@ -15,6 +15,7 @@ from style_library import (
     DRUM_NOTES, DRUM_STYLE_CONFIGS, BASS_THEORY_CONFIGS,
     DEFAULT_DRUM_CONFIG, DEFAULT_BASS_CONFIG
 )
+from instrument_map import select_instrument_for_role, get_instrument_program, normalize_instrument_name
 
 
 # ============================================================================
@@ -389,14 +390,11 @@ def generate_bass(pm, spec, section, t0, kicks, current_chords=None):
     root_key = key.split("_")[0]
     root_midi = NOTE_MAP.get(root_key, 48)  # C2 = 48
     
-    # Select bass instrument
-    bass_instrument = spec.get("style_params", {}).get("instruments", {}).get(
-        "bass", "Electric Bass (finger)"
-    )
-    try:
-        program = pretty_midi.instrument_name_to_program(bass_instrument)
-    except:
-        program = 33  # Electric Bass (finger) default
+    # Select bass instrument (with random alternative if available)
+    style_instruments = spec.get("style_params", {}).get("instruments", {})
+    bass_instrument = select_instrument_for_role("bass", style_instruments, use_random=True)
+    bass_instrument = normalize_instrument_name(bass_instrument)
+    program = get_instrument_program(bass_instrument)
     
     inst = pretty_midi.Instrument(program=program)
     

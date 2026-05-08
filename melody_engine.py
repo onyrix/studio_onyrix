@@ -2,6 +2,7 @@ import random
 import pretty_midi
 from utils import *
 from style_engine import get_style_instrument
+from instrument_map import select_instrument_for_role, get_instrument_program, normalize_instrument_name
 
 
 def rhythm_gate(t, kicks, melody_density=0.5):
@@ -67,19 +68,16 @@ def generate_melody(pm, spec, section, t0, kicks, motif):
     style_params = spec.get("style_params", {})
     melody_density = style_params.get("melody_density", 0.5)
     
-    # Select instruments based on style
-    lead_instrument = style_params.get("instruments", {}).get("lead", "Lead 1 (square)")
-    counter_instrument = style_params.get("instruments", {}).get("pad", "Pad 1 (new age)")
+    # Select instruments based on style (with random alternatives)
+    style_instruments = style_params.get("instruments", {})
+    lead_instrument = select_instrument_for_role("lead", style_instruments, use_random=True)
+    counter_instrument = select_instrument_for_role("pad", style_instruments, use_random=True)
     
-    try:
-        lead_program = pretty_midi.instrument_name_to_program(lead_instrument)
-    except:
-        lead_program = 80  # Lead 1 (square) default
+    lead_instrument = normalize_instrument_name(lead_instrument)
+    counter_instrument = normalize_instrument_name(counter_instrument)
     
-    try:
-        counter_program = pretty_midi.instrument_name_to_program(counter_instrument)
-    except:
-        counter_program = 88  # Pad 1 (new age) default
+    lead_program = get_instrument_program(lead_instrument)
+    counter_program = get_instrument_program(counter_instrument)
     
     lead = pretty_midi.Instrument(program=lead_program)
     counter = pretty_midi.Instrument(program=counter_program)
@@ -184,11 +182,10 @@ def generate_lead_melody(pm, spec, section, t0, kicks, motif):
     melody_density = style_params.get("melody_density", 0.5)
     intensity = section.get("intensity", 0.5)
     
-    lead_instrument = style_params.get("instruments", {}).get("lead", "Lead 1 (square)")
-    try:
-        program = pretty_midi.instrument_name_to_program(lead_instrument)
-    except:
-        program = 80
+    style_instruments = style_params.get("instruments", {})
+    lead_instrument = select_instrument_for_role("lead", style_instruments, use_random=True)
+    lead_instrument = normalize_instrument_name(lead_instrument)
+    program = get_instrument_program(lead_instrument)
     
     inst = pretty_midi.Instrument(program=program)
     
@@ -245,11 +242,10 @@ def generate_arpeggio(pm, spec, section, t0):
     melody_density = style_params.get("melody_density", 0.5)
     intensity = section.get("intensity", 0.5)
     
-    lead_instrument = style_params.get("instruments", {}).get("lead", "Lead 1 (square)")
-    try:
-        program = pretty_midi.instrument_name_to_program(lead_instrument)
-    except:
-        program = 80
+    style_instruments = style_params.get("instruments", {})
+    lead_instrument = select_instrument_for_role("lead", style_instruments, use_random=True)
+    lead_instrument = normalize_instrument_name(lead_instrument)
+    program = get_instrument_program(lead_instrument)
     
     inst = pretty_midi.Instrument(program=program)
     

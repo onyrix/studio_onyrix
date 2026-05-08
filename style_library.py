@@ -1203,9 +1203,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.4,
         "typical_progressions": [[0, 3, 4], [0, 4, 3], [0, 3]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 1 (new age)",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 5 (charang)"],
+            "pad": ["Pad 1 (new age)", "Pad 2 (warm)", "Pad 5 (bowed)"],
+            "bass": ["Electric Bass (finger)", "Synth Bass 1", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.2},
@@ -1232,9 +1232,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.3,
         "typical_progressions": [[0, 3], [0, 4, 3]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 5 (bowed)",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 6 (voice)"],
+            "pad": ["Pad 5 (bowed)", "Pad 4 (choir)", "Pad 2 (warm)"],
+            "bass": ["Electric Bass (finger)", "Synth Bass 2", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.3},
@@ -1260,9 +1260,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.5,
         "typical_progressions": [[0, 3, 4, 3], [0, 5, 3, 4], [0, 1, 4, 3]],
         "instruments": {
-            "lead": "Electric Piano 1",
-            "pad": "String Ensemble 1",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Electric Piano 1", "Electric Piano 2", "Acoustic Grand Piano"],
+            "pad": ["String Ensemble 1", "Pad 2 (warm)", "Synth Strings 1"],
+            "bass": ["Electric Bass (finger)", "Electric Bass (pick)", "Acoustic Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.3},
@@ -1289,9 +1289,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.3,
         "typical_progressions": [[0, 5, 3, 4], [0, 3, 5, 4], [0, 2, 5, 3]],
         "instruments": {
-            "lead": "Electric Piano 1",
-            "pad": "Pad 1 (new age)",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Electric Piano 1", "Electric Piano 2", "Pad 1 (new age)"],
+            "pad": ["Pad 1 (new age)", "Pad 2 (warm)", "Pad 5 (bowed)"],
+            "bass": ["Electric Bass (finger)", "Fretless Bass", "Synth Bass 1"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1320,9 +1320,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.5,
         "typical_progressions": [[0, 3, 4], [0, 5, 3], [0, 3]],
         "instruments": {
-            "lead": "Synth Brass 1",
-            "pad": "Pad 1 (new age)",
-            "bass": "Synth Bass 1"
+            "lead": ["Synth Brass 1", "Lead 1 (square)", "Lead 2 (sawtooth)"],
+            "pad": ["Pad 1 (new age)", "Pad 3 (polysynth)", "Synth Strings 1"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Electric Bass (finger)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1350,9 +1350,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.4,
         "typical_progressions": [[0, 3, 5], [0, 5, 3, 6], [0, 2, 5, 3]],
         "instruments": {
-            "lead": "Synth Strings 1",
-            "pad": "Pad 2 (warm)",
-            "bass": "Synth Bass 1"
+            "lead": ["Synth Strings 1", "Lead 6 (voice)", "Electric Piano 1"],
+            "pad": ["Pad 2 (warm)", "Pad 1 (new age)", "Pad 5 (bowed)"],
+            "bass": ["Synth Bass 1", "Electric Bass (finger)", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1379,9 +1379,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.3,
         "typical_progressions": [[0], [0, 3], [0, 6]],
         "instruments": {
-            "lead": "Lead 6 (voice)",
-            "pad": "Pad 4 (choir)",
-            "bass": "Synth Bass 1"
+            "lead": ["Lead 6 (voice)", "Lead 2 (sawtooth)", "Synth Brass 1"],
+            "pad": ["Pad 4 (choir)", "Pad 5 (bowed)", "Pad 8 (sweep)"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 16, "intensity": 0.2},
@@ -1409,9 +1409,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.2,
         "typical_progressions": [[0], [0, 6]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 8 (sweep)",
-            "bass": "Synth Bass 1"
+            "lead": ["Lead 1 (square)", "Lead 4 (chiff)", "Lead 8 (bass + lead)"],
+            "pad": ["Pad 8 (sweep)", "Pad 6 (metallic)", "Pad 7 (halo)"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Lead 8 (bass + lead)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 16, "intensity": 0.1},
@@ -1439,9 +1439,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.4,
         "typical_progressions": [[0, 3], [0, 4, 3]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 5 (bowed)",
-            "bass": "Synth Bass 2"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Synth Brass 2"],
+            "pad": ["Pad 5 (bowed)", "Pad 4 (choir)", "Pad 6 (metallic)"],
+            "bass": ["Synth Bass 2", "Synth Bass 1", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.3},
@@ -1469,9 +1469,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.5,
         "typical_progressions": [[0, 3, 4], [0, 5, 3]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 1 (new age)",
-            "bass": "Synth Bass 1"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 5 (charang)"],
+            "pad": ["Pad 1 (new age)", "Pad 3 (polysynth)", "Synth Strings 1"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Electric Bass (finger)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.3},
@@ -1496,9 +1496,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.1,
         "typical_progressions": [[0, 5, 3], [0, 2, 5], [0, 6, 3, 5]],
         "instruments": {
-            "lead": "Pad 1 (new age)",
-            "pad": "Pad 4 (choir)",
-            "bass": "Pad 5 (bowed)"
+            "lead": ["Pad 1 (new age)", "Pad 2 (warm)", "Pad 5 (bowed)"],
+            "pad": ["Pad 4 (choir)", "Pad 5 (bowed)", "Pad 7 (halo)"],
+            "bass": ["Pad 5 (bowed)", "Synth Bass 2", "Acoustic Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 16, "intensity": 0.1},
@@ -1524,9 +1524,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.4,
         "typical_progressions": [[0, 3, 5, 6], [0, 5, 3, 4], [0, 2, 5, 1]],
         "instruments": {
-            "lead": "Orchestra Strings",
-            "pad": "Pad 4 (choir)",
-            "bass": "Pad 5 (bowed)"
+            "lead": ["String Ensemble 1", "Orchestra Hit", "French Horn"],
+            "pad": ["Pad 4 (choir)", "Pad 5 (bowed)", "String Ensemble 1"],
+            "bass": ["Pad 5 (bowed)", "Timpani", "Contrabass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1554,9 +1554,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.4,
         "typical_progressions": [[0, 5, 3, 4], [0, 3, 5], [0, 2, 5, 3]],
         "instruments": {
-            "lead": "Electric Piano 1",
-            "pad": "Pad 2 (warm)",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Electric Piano 1", "Electric Piano 2", "Lead 6 (voice)"],
+            "pad": ["Pad 2 (warm)", "Pad 1 (new age)", "Synth Strings 1"],
+            "bass": ["Electric Bass (finger)", "Fretless Bass", "Synth Bass 1"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1585,9 +1585,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.6,
         "typical_progressions": [[0, 4, 5, 3], [0, 5, 3, 4], [0, 4, 3, 5]],
         "instruments": {
-            "lead": "Electric Guitar (clean)",
-            "pad": "String Ensemble 1",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Electric Guitar (clean)", "Overdriven Guitar", "Electric Piano 1"],
+            "pad": ["String Ensemble 1", "Pad 2 (warm)", "Synth Strings 1"],
+            "bass": ["Electric Bass (finger)", "Electric Bass (pick)", "Slap Bass 1"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.4},
@@ -1616,9 +1616,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.6,
         "typical_progressions": [[0, 3], [0, 4, 3], [0, 3, 4]],
         "instruments": {
-            "lead": "Electric Guitar (clean)",
-            "pad": "Electric Piano 1",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Electric Guitar (clean)", "Electric Piano 1", "Alto Sax"],
+            "pad": ["Electric Piano 1", "Pad 2 (warm)", "String Ensemble 1"],
+            "bass": ["Electric Bass (finger)", "Slap Bass 1", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.4},
@@ -1647,9 +1647,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.7,
         "typical_progressions": [[0, 1, 4, 3], [2, 5, 1, 4], [5, 1, 4, 0], [1, 4, 0]],
         "instruments": {
-            "lead": "Acoustic Grand Piano",
-            "pad": "String Ensemble 1",
-            "bass": "Acoustic Bass"
+            "lead": ["Acoustic Grand Piano", "Electric Piano 1", "Tenor Sax"],
+            "pad": ["String Ensemble 1", "Pad 2 (warm)", "Electric Piano 1"],
+            "bass": ["Acoustic Bass", "Electric Bass (finger)", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.3},
@@ -1679,9 +1679,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.6,
         "typical_progressions": [[0, 4, 5, 3], [0, 5, 3, 4], [0, 3, 5, 4]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 1 (new age)",
-            "bass": "Synth Bass 1"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Synth Brass 1"],
+            "pad": ["Pad 1 (new age)", "Pad 3 (polysynth)", "Synth Strings 1"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Electric Bass (finger)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.3},
@@ -1710,9 +1710,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.5,
         "typical_progressions": [[0, 3, 5, 4], [0, 5, 3, 4], [0, 3, 4, 5]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 1 (new age)",
-            "bass": "Synth Bass 2"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 5 (charang)"],
+            "pad": ["Pad 1 (new age)", "Pad 2 (warm)", "Pad 5 (bowed)"],
+            "bass": ["Synth Bass 2", "Synth Bass 1", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1739,9 +1739,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.5,
         "typical_progressions": [[0, 3, 5, 4], [0, 5, 3], [0, 3, 4]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 1 (new age)",
-            "bass": "Synth Bass 1"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Synth Brass 1"],
+            "pad": ["Pad 1 (new age)", "Pad 3 (polysynth)", "Pad 5 (bowed)"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Electric Bass (finger)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.3},
@@ -1768,9 +1768,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.6,
         "typical_progressions": [[0, 3, 5, 4], [0, 5, 3, 4], [0, 3, 4, 5]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 1 (new age)",
-            "bass": "Synth Bass 2"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 5 (charang)"],
+            "pad": ["Pad 1 (new age)", "Pad 5 (bowed)", "Pad 6 (metallic)"],
+            "bass": ["Synth Bass 2", "Synth Bass 1", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.3},
@@ -1797,9 +1797,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.4,
         "typical_progressions": [[0, 1, 3], [0, 3, 1], [0, 6, 3]],
         "instruments": {
-            "lead": "Lead 6 (voice)",
-            "pad": "Pad 4 (choir)",
-            "bass": "Synth Bass 2"
+            "lead": ["Lead 6 (voice)", "Lead 2 (sawtooth)", "Pad 5 (bowed)"],
+            "pad": ["Pad 4 (choir)", "Pad 5 (bowed)", "Pad 6 (metallic)"],
+            "bass": ["Synth Bass 2", "Synth Bass 1", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1826,9 +1826,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.5,
         "typical_progressions": [[0, 3], [0, 1, 3], [0, 6]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 5 (bowed)",
-            "bass": "Synth Bass 1"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Synth Brass 1"],
+            "pad": ["Pad 5 (bowed)", "Pad 4 (choir)", "Pad 6 (metallic)"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Fretless Bass"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.3},
@@ -1855,9 +1855,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.6,
         "typical_progressions": [[0, 3, 4], [0, 4, 3], [0, 3]],
         "instruments": {
-            "lead": "Electric Piano 1",
-            "pad": "Pad 1 (new age)",
-            "bass": "Electric Bass (finger)"
+            "lead": ["Electric Piano 1", "Electric Piano 2", "Alto Sax"],
+            "pad": ["Pad 1 (new age)", "Pad 2 (warm)", "String Ensemble 1"],
+            "bass": ["Electric Bass (finger)", "Fretless Bass", "Slap Bass 1"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.3},
@@ -1884,9 +1884,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.5,
         "typical_progressions": [[0, 2, 6, 5], [0, 5, 2, 3], [6, 3, 0]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 8 (sweep)",
-            "bass": "Synth Bass 2"
+            "lead": ["Lead 1 (square)", "Lead 4 (chiff)", "Lead 8 (bass + lead)"],
+            "pad": ["Pad 8 (sweep)", "Pad 6 (metallic)", "Pad 7 (halo)"],
+            "bass": ["Synth Bass 2", "Synth Bass 1", "Lead 8 (bass + lead)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.3},
@@ -1913,9 +1913,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.4,
         "typical_progressions": [[0, 2, 4], [0, 4, 2], [0, 6]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 8 (sweep)",
-            "bass": "Synth Bass 2"
+            "lead": ["Lead 1 (square)", "Lead 4 (chiff)", "FX 8 (sci-fi)"],
+            "pad": ["Pad 8 (sweep)", "Pad 6 (metallic)", "FX 4 (atmosphere)"],
+            "bass": ["Synth Bass 2", "Synth Bass 1", "Lead 8 (bass + lead)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 8, "intensity": 0.2},
@@ -1942,9 +1942,9 @@ STYLE_LIBRARY = {
         "melody_density": 0.6,
         "typical_progressions": [[0, 4, 5, 3], [0, 5, 3, 4], [0, 3, 5, 4]],
         "instruments": {
-            "lead": "Lead 1 (square)",
-            "pad": "Pad 1 (new age)",
-            "bass": "Synth Bass 1"
+            "lead": ["Lead 1 (square)", "Lead 2 (sawtooth)", "Synth Brass 1"],
+            "pad": ["Pad 1 (new age)", "Pad 3 (polysynth)", "Synth Strings 1"],
+            "bass": ["Synth Bass 1", "Synth Bass 2", "Electric Bass (finger)"]
         },
         "arrangement_template": [
             {"type": "intro", "bars": 4, "intensity": 0.3},
