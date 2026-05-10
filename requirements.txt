@@ -1,0 +1,43 @@
+# Studio Onyrix v2 - Requirements
+
+# Core dependencies (existing)
+pretty_midi>=0.2.9
+mido>=1.2.10
+numpy>=1.21.0
+fluidsynth>=1.3.0
+soundfile>=0.12.1
+
+# AI MIDI Generation (optional - install as needed)
+# PyTorch (required for MidiBERT, DiffMIDI)
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# MidiBERT (melody/chord generation)
+# Install from: pip install midibert-remi
+# Or from source: https://github.com/wazenmai/MidiBERT-Piano
+midibert-remi>=0.1.0
+
+# DiffMIDI (diffusion-based MIDI generation)
+# Install from source: https://github.com/zbwang/diffmidi
+diffmidi>=0.1.0
+
+# Magenta MMM (multi-track generation)
+# Note: Requires TensorFlow, may not support Python 3.12+
+# Install: pip install magenta
+# If TensorFlow issues: pip install tensorflow>=2.12.0
+magenta>=2.1.0
+
+# Ollama (local LLM for prompt parsing)
+# Install from: https://ollama.com
+# Then: ollama pull llama3.2:3b
+# Python wrapper (optional):
+ollama>=0.1.0
+
+# Utilities
+json5>=0.9.0
+tqdm>=4.60.0
+
+# Development/testing (optional)
+pytest>=7.0.0
+black>=23.0.0
+flake8>=6.0.0
