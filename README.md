@@ -1,392 +1,388 @@
-# Studio Onyrix v2
+# Studio Onyrix v4 - AI-Powered DAW Music Production
 
-**Studio Onyrix v2** is a hybrid AI + rule-based music generation system that creates MIDI compositions in 25+ styles. It combines **local pre-trained AI models** (MidiBERT, MMM, DiffMIDI) with a granular rule-based engine for full DAW-like control.
+**Studio Onyrix v4** is a professional AI-powered DAW (Digital Audio Workstation) for music producers. Instead of generating full songs from vague prompts, it lets you build tracks **part by part** — like a real DAW — with precise musical control over every element.
 
-🎵 **Now with Local AI**: Generate music using natural language prompts, with zero cloud costs!
+🎵 **Generate individual instrument parts** with exact BPM, key, scale, division, and measures. Build your song track by track.
 
-## 🚀 What's New in v2
+---
 
-- **Local AI Integration**: MidiBERT, Multi-Track Music Machine (MMM), DiffMIDI
-- **Natural Language Prompts**: "Create a chill lofi track in G major" → Full MIDI arrangement
-- **Hybrid Workflow**: AI seeds + rule-based refinements (humanization, style tweaks)
-- **Zero Cloud Costs**: All AI models run locally on your machine
-- **Enhanced Main Interface**: New `--ai` flag for AI generation mode
+## 🚀 Key Concepts
 
-## 🎵 Core Features
+| Concept | Description |
+|---------|-------------|
+| **PART** | A single instrument part (e.g., "808 bass for 8 bars in C minor") |
+| **PROJECT** | Collection of parts forming a complete song |
+| **MEMORY** | Coherence system that tracks what was generated for musical consistency |
+| **PROMPT ENGINEERING** | Builds precise musical prompts from your parameters |
+| **MIX** | Combines all parts into a final stereo master |
 
-- **Hybrid AI + Rule-Based Generation**: Best of both worlds - AI creativity + precise control
-- **25+ Music Styles**: Trap, LoFi, Techno, Jazz, Rock, Synthwave, and more
-- **Local AI Models**: MidiBERT (melodies), MMM (multi-track), DiffMIDI (drums/bass)
-- **Natural Language Input**: Parse prompts with local LLMs (Ollama + Llama 3)
-- **Granular DAW Control**: Every note editable via rule-based engine
-- **Multi-Track Output**: Separate drums, bass, melody, pads, chords
-- **MIDI + Audio**: Generate MIDI files and render to WAV
-- **Memoria Tematica**: Motif evolution system for coherent compositions
+---
 
-## 🏗️ Architecture v2
+## 🏗️ Architecture
 
 ```
-User Prompt (Natural Language)
-         ↓
-    [AI Prompt Parser] → Ollama/Llama 3 (local LLM)
-         ↓
-    {style, key, mood, bpm, instruments}
-         ↓
-    ┌──────────────────────────────────────┐
-    │     AI MIDI Generators (Local)        │
-    │  • MidiBERT: Melodies & chords      │
-    │  • MMM: Full multi-track MIDI       │
-    │  • DiffMIDI: Drums & bass patterns  │
-    └──────────────────────────────────────┘
-         ↓
-    [Hybrid Workflow] AI seeds + Rule-based editing
-         ↓
-    ┌──────────────────────────────────────┐
-    │   Rule-Based Engines (Granular)      │
-    │  • drums_bass.py: Rhythm & bass     │
-    │  • melody_engine.py: Melodies       │
-    │  • harmonic_engine.py: Chords       │
-    │  • style_engine.py: Style params    │
-    └──────────────────────────────────────┘
-         ↓
-    [Output] MIDI (.mid) + Audio (.wav)
-         ↓
-    [Future: DAW Interface for human editing]
+User defines a PART:
+  BPM: 140, Division: 4/4
+  Root: C, Scale: natural_minor
+  Measures: 8
+  Instrument: 808_bass
+  Relation: verse
+  Volume: 0.8, Pan: 0.0
+      ↓
+  [DAWPartGenerator]
+  Builds precise prompt with musical context
+      ↓
+  [MusicGen (Meta)] - State-of-the-Art AI
+      ↓
+  32kHz WAV Audio + librosa Analysis (tempo, beats, pitch)
+      ↓
+  Part saved to PROJECT with MEMORY
+      ↓
+  Mix all parts → Final master WAV
 ```
+
+---
 
 ## 📦 Installation
 
 ### Prerequisites
-- **Python 3.10 or 3.11 (64-bit)** - Avoid 3.12+ (TensorFlow/Magenta incompatibility)
+- **Python 3.10+** (64-bit recommended)
 - **pip** (Python package manager)
-- **Git** (for downloading model checkpoints)
+- **GPU Recommended**: For MusicGen `large` model (CPU works for `small`)
 
-### Step 1: Clone & Install Core Dependencies
+### Quick Install
 ```bash
-git clone https://github.com/onyrix/studio_onyrix.git
-cd studio_onyrix
+# Core dependencies
+pip install numpy soundfile
 
-# Install core dependencies
-pip install pretty_midi mido numpy soundfile fluidsynth
-```
+# Modern AI - MusicGen (required for generation)
+pip install transformers torchaudio
 
-### Step 2: Install AI Dependencies (Optional)
-```bash
-# PyTorch (required for MidiBERT, DiffMIDI)
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
+# Audio analysis
+pip install librosa
 
-# MidiBERT (melody generation)
-pip install midibert-remi
-
-# DiffMIDI (diffusion-based generation)
-# Install from source: https://github.com/zbwang/diffmidi
-
-# Magenta MMM (multi-track generation)
-pip install magenta
-
-# Ollama (local LLM for prompt parsing)
-# Download from: https://ollama.com
-# Then pull model:
-ollama pull llama3.2:3b
-```
-
-### Step 3: Download AI Model Checkpoints
-```bash
-# Create checkpoints directory
-mkdir checkpoints
-
-# See download instructions
-python -c "from ai_midi_generator import download_checkpoints; download_checkpoints()"
-```
-
-## 🎯 Usage
-
-### Basic Generation (Rule-Based)
-```bash
-# Generate a trap track in F minor (default)
+# Optional: Full test
 python main.py
-
-# Generate in specific style
-python main.py lofi D_major 0.2
-
-# Use --ai flag for AI-enhanced generation
-python main.py techno C_minor 0.5 --ai
 ```
-
-### Natural Language Prompts
-```python
-from ai_prompt_parser import generate_from_prompt
-
-# Generate from prompt
-midi = generate_from_prompt("Create a chill lofi track in G major")
-midi.write("output/my_lofi_track.mid")
-```
-
-### Command Line Options
-```bash
-# List all available styles
-python main.py --list
-# or
-python main.py -l
-
-# Generate with AI mode
-python main.py trap C_minor 0.3 --ai
-
-# Parameters:
-#   1. style: Music style (trap, lofi, techno, etc.)
-#   2. key: Musical key (C_major, F_minor, etc.)
-#   3. chaos: Variation level 0.0-1.0 (default: 0.3)
-#   4. --ai: Enable AI generation (if models available)
-```
-
-## 🤖 AI Models Available
-
-### MidiBERT (Melody & Chord Generation)
-- **Purpose**: Generate melodies and chord progressions
-- **Model Size**: ~300MB
-- **Pre-trained on**: 1.7M MIDI files
-- **Usage**: `python main.py jazz C_major 0.3 --ai`
-
-### MMM (Multi-Track Music Machine)
-- **Purpose**: Full multi-track MIDI generation
-- **Model Size**: ~1GB
-- **Pre-trained on**: Lakh MIDI Dataset (176k+ files)
-- **Output**: Separate tracks for drums, bass, melody, pads
-
-### DiffMIDI (Diffusion-Based)
-- **Purpose**: High-quality drum/bass patterns
-- **Model Size**: ~500MB
-- **Technology**: Diffusion probabilistic models
-- **Quality**: State-of-the-art MIDI generation
-
-### Ollama/Llama 3 (Prompt Parsing)
-- **Purpose**: Convert natural language to music parameters
-- **Model**: Llama 3.2 3B (fast, efficient)
-- **Zero Cost**: Runs 100% locally
-
-## 🎼 Available Music Styles (25+)
-
-### Hip Hop / Urban
-- **trap** (130-160 BPM) - Syncopated bass, complex rhythms
-- **drill** (130-145 BPM) - Sliding bass, dark atmospheres
-- **boom_bap** (80-100 BPM) - Swing drums, walking bass
-- **lofi** (65-90 BPM) - Relaxed vibes, complex chords
-
-### Club / Electronic
-- **house** (118-130 BPM) - Four-on-the-floor, build/drop
-- **deep_house** (118-122 BPM) - Dorian scales, groovy bass
-- **techno** (125-140 BPM) - Repetitive patterns, phrygian mode
-- **minimal_techno** (120-128 BPM) - Sparse, locrian mode
-- **dubstep** (135-145 BPM) - Wobble bass, intense drops
-- **dnb** (165-180 BPM) - Fast breaks, rolling bass
-
-### Cinematic / Atmospheric
-- **ambient** (40-80 BPM) - Ethereal soundscapes
-- **cinematic** (60-100 BPM) - Orchestral arrangements
-- **downtempo** (80-110 BPM) - Relaxed rhythms
-
-### Band / Acoustic
-- **rock** (90-140 BPM) - Classic structure, driving bass
-- **funk** (95-120 BPM) - Syncopated rhythms, slap bass
-- **jazz** (90-140 BPM) - Swing, walking bass, complex chords
-
-### Synth / Retro / Electronic
-- **synthpop** (100-120 BPM) - Melodic synths, pop structure
-- **synthwave** (85-110 BPM) - 80s retro, arpeggiators
-- **retrowave** (90-115 BPM) - Driving bass, retro vibes
-- **outrun** (95-125 BPM) - Energetic, synth guitars
-- **darkwave** (90-115 BPM) - Dark atmospheres, phrygian mode
-- **ebm** (120-140 BPM) - Electronic Body Music, martial patterns
-- **electro** (110-130 BPM) - Electro-funk, funky bass
-- **idm** (90-160 BPM) - Experimental, chromatic scales
-- **glitch** (70-130 BPM) - Irregular patterns, whole-tone scales
-- **electronic_pop** (100-128 BPM) - Modern pop structure
-
-## 📁 Project Structure v2
-
-```
-studio_onyrix/
-├── main.py                    # Entry point with AI/hybrid support
-├── ai_midi_generator.py      # NEW: AI models (MidiBERT, MMM, DiffMIDI)
-├── ai_prompt_parser.py       # NEW: Natural language → music params
-├── requirements.txt           # NEW: Updated dependencies
-│
-├── melody_engine.py          # Melody generation (rule-based)
-├── harmonic_engine.py        # Chord progressions (rule-based)
-├── drums_bass.py            # Drums & bass (rule-based + music theory)
-├── style_engine.py           # Style parameter builder
-├── style_library.py         # 25+ style definitions
-├── global_memory.py         # Motif memory system
-├── audio_render.py          # MIDI → WAV rendering
-├── automation.py            # Parameter automation
-├── utils.py                 # Music theory utilities
-├── instrument_map.py        # MIDI instrument mappings
-│
-├── checkpoints/             # NEW: AI model checkpoints
-│   ├── midibert-piano.ckpt
-│   ├── mmm.ckpt
-│   └── diffmidi.ckpt
-│
-├── output/                  # Generated MIDI and WAV files
-├── docs/
-│   └── install_and_run.txt
-└── README.md               # This file (v2)
-```
-
-## 🧠 How Hybrid Generation Works
-
-### AI Stage (Optional)
-1. **Prompt Parsing**: Ollama/Llama 3 converts "chill lofi in G major" → `{style: "lofi", key: "G_major", ...}`
-2. **AI Generation**:
-   - MidiBERT generates melody and chord progressions
-   - MMM creates full multi-track arrangement
-   - DiffMIDI produces drum/bass patterns
-
-### Rule-Based Stage (Always)
-3. **Style Application**: Apply style-specific parameters (drum patterns, swing, etc.)
-4. **Humanization**: Add timing jitter, velocity variation, ghost notes
-5. **Refinement**: Adjust intensity per section, apply motif evolution
-
-### Output
-6. **MIDI File**: Editable in any DAW (Ableton, FL Studio, Logic, etc.)
-7. **Audio Render**: Synthesized WAV file via FluidSynth
-
-## 💻 Programmatic Usage
-
-### Basic (Rule-Based)
-```python
-from main import generate_track_with_style
-
-# Generate a jazz track
-midi = generate_track_with_style("jazz", "D_minor", chaos=0.4)
-midi.write("output/my_jazz_track.mid")
-```
-
-### With AI (Hybrid)
-```python
-from main import generate_track_with_style
-
-# Generate with AI enhancement
-midi = generate_track_with_style(
-    style_name="trap",
-    key="C_minor",
-    chaos=0.3,
-    use_ai=True  # Enable AI generation
-)
-midi.write("output/ai_trap_track.mid")
-```
-
-### Natural Language
-```python
-from ai_prompt_parser import generate_from_prompt
-
-# Generate from prompt
-midi = generate_from_prompt(
-    "Create an aggressive techno track with heavy bass in F minor",
-    use_ai=True
-)
-midi.write("output/my_techno_track.mid")
-```
-
-### Direct AI Model Access
-```python
-from ai_midi_generator import HybridMIDIGenerator
-
-generator = HybridMIDIGenerator()
-
-# Check available models
-print(generator.available_models)
-# {'midibert': True, 'mmm': True, 'diffmidi': True}
-
-# Generate hybrid track
-midi = generator.generate_hybrid(
-    style="synthwave",
-    key="A_minor",
-    bpm=110,
-    chaos=0.3,
-    bars=16,
-    use_ai=True
-)
-```
-
-## 🔧 Development
-
-### Adding a New Style
-Edit `style_library.py` and add your style definition:
-```python
-"my_style": {
-    "bpm_range": (120, 130),
-    "drum_density": 0.7,
-    "swing": 0.1,
-    "patterns": {...},
-    "scale_type": "natural_minor",
-    "chord_complexity": 0.4,
-    "bass_pattern": "driving",
-    "melody_density": 0.5,
-    "typical_progressions": [[0, 3, 4], [0, 5, 3]],
-    "instruments": {
-        "lead": "Lead 1 (square)",
-        "pad": "Pad 1 (new age)",
-        "bass": "Synth Bass 1"
-    },
-    "arrangement_template": [...]
-}
-```
-
-### Extending AI Capabilities
-Create custom AI pipelines in `ai_midi_generator.py`:
-```python
-class CustomAIGenerator:
-    def generate_custom(self, prompt, **kwargs):
-        # Your custom AI logic here
-        pass
-```
-
-## 📝 Notes on AI Models
-
-### System Requirements for AI
-| Component | Minimum | Recommended |
-|-----------|----------|-------------|
-| **RAM** | 8GB | 16GB+ |
-| **GPU** | None (CPU works) | NVIDIA GPU 4GB+ VRAM |
-| **Storage** | 5GB (for models) | 10GB |
-| **Python** | 3.10+ | 3.11 |
-
-### Fallback Behavior
-If AI models are not available, the system automatically falls back to rule-based generation:
-```python
-# This will use rule-based if AI models not installed
-python main.py trap C_minor 0.3 --ai
-# Output: "Warning: AI modules not installed. Using rule-based generation."
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Priority areas:
-- **DAW Interface**: Build a GUI for granular editing
-- **More AI Models**: Integrate MusicGen, AudioCraft
-- **Vocal Generation**: Add lyric/melody synthesis
-- **Effects Processing**: Reverb, delay, compression, EQ
-- **Sample Support**: Load and manipulate audio samples
-
-## 📄 License
-
-Open-source project available for personal and commercial use.
-
-## 🙏 Acknowledgments
-
-- **Magenta Team** (Google) for MMM and music AI tools
-- **MidiBERT Authors** for pre-trained melody models
-- **DiffMIDI Authors** for diffusion-based MIDI generation
-- **Ollama Team** for local LLM infrastructure
-- **Pretty MIDI** library for MIDI manipulation
-- **FluidSynth** for audio rendering
-
-## 📧 Contact
-
-- GitHub: [onyrix/studio_onyrix](https://github.com/onyrix/studio_onyrix)
-- Issues: [Report bugs or request features](https://github.com/onyrix/studio_onyrix/issues)
 
 ---
 
-**Studio Onyrix v2** - Hybrid AI + Rule-Based Music Generation for the Future of DAW Workflows.
+## 🎯 Usage
+
+### Interactive Mode (Recommended)
+```bash
+python main.py
+```
+Opens an interactive shell where you can:
+```
+[My Song] > new My New Track
+[My Song] > add --preset bass --bpm 140 --root C --scale natural_minor
+[My Song] > add --preset drums --bpm 140
+[My Song] > add --preset chords --root C --scale natural_minor
+[My Song] > mix
+[My Song] > save my_track.json
+```
+
+### Command Line
+```bash
+# Create a new project
+python main.py new "My Track"
+
+# Add a bass part (with full control)
+python main.py part \
+  --instrument 808_bass \
+  --bpm 140 \
+  --division 4/4 \
+  --root C \
+  --scale natural_minor \
+  --measures 8 \
+  --relation verse \
+  --volume 0.8 \
+  --pan 0.0 \
+  --temperature 1.0
+  --gen true
+
+# Add parts using presets
+python main.py part --preset drums --bpm 140
+python main.py part --preset chords --root C --scale natural_minor
+python main.py part --preset melody --bpm 140 --root C --scale natural_minor
+
+# Manage project
+python main.py list          # List all parts
+python main.py info 0        # Show part 0 details
+python main.py remove 1      # Remove part 1
+python main.py show          # Project summary
+
+# Mix all parts to audio
+python main.py mix
+
+# Save/Load
+python main.py save my_song.json
+python main.py load my_song.json
+
+# Explore
+python main.py instruments   # List all available instruments
+python main.py scales        # List all scale patterns
+```
+
+---
+
+## 🎸 Available Instruments
+
+### Bass
+| Instrument | Description | BPM Range |
+|------------|-------------|-----------|
+| `808_bass` | Deep subby 808 bass, sustained | 60-160 |
+| `sub_bass` | Clean sine wave sub bass | 60-140 |
+| `pluck_bass` | Electric bass guitar, attacky | 80-180 |
+| `synth_bass` | Analog synth bass, filter sweep | 100-160 |
+
+### Drums
+| Instrument | Description | BPM Range |
+|------------|-------------|-----------|
+| `kick` | Punchy kick drum | 60-200 |
+| `snare` | Crisp snare drum | 60-200 |
+| `hi_hat` | Tight hi-hat pattern | 80-200 |
+| `drums_full` | Full drum kit | 60-180 |
+| `trap_drums` | 808 kicks, hi-hat rolls | 130-170 |
+| `techno_drums` | Four-on-the-floor, clap | 120-150 |
+| `dnb_drums` | Fast breaks, intricate | 165-180 |
+
+### Chords / Keys
+| Instrument | Description | BPM Range |
+|------------|-------------|-----------|
+| `piano` | Acoustic grand piano | 60-160 |
+| `synth_pad` | Warm analog synth pad | 60-140 |
+| `organ` | Hammond organ | 60-140 |
+| `wurlitzer` | Vintage electric piano | 60-130 |
+
+### Melody / Lead
+| Instrument | Description | BPM Range |
+|------------|-------------|-----------|
+| `synth_lead` | Monophonic synth lead | 80-180 |
+| `violin` | Orchestral violin | 60-140 |
+| `flute` | Airy flute melody | 60-140 |
+| `guitar_melody` | Electric guitar lead | 60-160 |
+
+### Arpeggio
+| Instrument | Description | BPM Range |
+|------------|-------------|-----------|
+| `arp` | Synthesizer arpeggio | 100-170 |
+| `pluck_arp` | Plucked synth arpeggio | 100-160 |
+
+### FX
+| Instrument | Description | BPM Range |
+|------------|-------------|-----------|
+| `riser` | Rising tension builder | 60-200 |
+| `noise_sweep` | White noise transition | 60-200 |
+| `texture_pad` | Ambient texture | 40-100 |
+
+---
+
+## 🎼 Available Scales
+
+### Major/Minor
+- `major`, `natural_minor`, `harmonic_minor`, `melodic_minor`
+
+### Modes
+- `dorian`, `phrygian`, `lydian`, `mixolydian`, `aeolian`, `locrian`
+
+### Pentatonic/Blues
+- `major_pentatonic`, `minor_pentatonic`, `blues`
+
+### Symmetrical
+- `chromatic`, `whole_tone`, `diminished`
+
+---
+
+## 📁 Part Parameters (DAWPart)
+
+Every part you generate has these professional DAW controls:
+
+| Parameter | Default | Range | Description |
+|-----------|---------|-------|-------------|
+| `bpm` | 120 | 30-300 | Tempo in BPM |
+| `division` | 4/4 | 2/2,3/4,4/4,5/4,6/8,7/8,12/8 | Time signature |
+| `root` | C | C,C#,D,...,B | Tonic/root note |
+| `scale` | natural_minor | all 17 scales | Scale pattern |
+| `measures` | 8 | 1+ | Number of bars |
+| `instrument` | synth_pad | any from list | Instrument preset |
+| `relation` | verse | intro,verse,chorus,bridge,drop,build,fill,outro | Section type |
+| `volume` | 0.8 | 0.0-1.0 | Track volume |
+| `pan` | 0.0 | -1.0 to 1.0 | Stereo pan |
+| `temperature` | 1.0 | 0.5-1.5 | AI creativity |
+| `extra` | "" | any text | Extra prompt instructions |
+
+---
+
+## 🧠 How It Works
+
+### Prompt Engineering
+When you add a part, the system builds a precise prompt:
+```
+Generate a deep subby 808 bass, sustained, heavy low end part for music production.
+Time signature: 4/4.
+Tempo: 140 BPM.
+Length: 8 bars (13.7 seconds).
+Key: C natural minor.
+Scale notes: C, D, D#, F, G, G#, A#.
+Section: verse section, supporting the narrative.
+Instrument register: low.
+```
+
+### Memory System
+The DAWMemory tracks all generated parts and provides contextual prompts:
+```
+Existing instruments: 808_bass.
+Previous verse had 808_bass in C natural minor at 140 BPM.
+This is part 2 in the project.
+```
+
+### Audio Analysis
+After generation, librosa extracts:
+- **Tempo detection** (checks if MusicGen followed your BPM)
+- **Beat positions** (for future quantization)
+- **Pitch analysis** (key/scale estimation)
+- **Spectral features** (timbre classification)
+
+### Mixing
+The DAWMixer combines all parts with:
+- Volume per track
+- Stereo panning
+- Timeline alignment (order determines arrangement)
+- Normalization
+
+---
+
+## 📁 Project Files
+
+Projects are saved as JSON files:
+```json
+{
+  "project": {
+    "name": "My Track",
+    "bpm": 140,
+    "division": "4/4",
+    "root": "C",
+    "scale": "natural_minor"
+  },
+  "parts": [
+    {
+      "instrument": "808_bass",
+      "bpm": 140,
+      "root": "C",
+      "scale": "natural_minor",
+      "measures": 8,
+      "relation": "verse",
+      "volume": 0.8,
+      "pan": 0.0,
+      "audio_path": "output/808_bass_verse_223543_223905.wav",
+      "duration": 6.9,
+      "analysis": {"tempo": 138.9, ...}
+    }
+  ]
+}
+```
+
+---
+
+## 💻 Programmatic Usage
+
+```python
+from daw_engine import DAWProject, DAWPart, DAWPartGenerator
+
+# Create a project
+project = DAWProject(name="My Track", bpm=140, root="C", scale="natural_minor")
+
+# Create a bass part
+bass_part = DAWPart(
+    instrument="808_bass",
+    bpm=140,
+    root="C",
+    scale="natural_minor",
+    measures=8,
+    relation="verse",
+    volume=0.8,
+    pan=0.0,
+    temperature=0.6,
+)
+project.add_part(bass_part)
+
+# Generate audio
+generator = DAWPartGenerator(model_size='small')
+result = generator.generate_part(bass_part)
+
+# Add more parts
+drum_part = DAWPart(instrument="trap_drums", bpm=140, measures=8, relation="verse")
+project.add_part(drum_part)
+result2 = generator.generate_part(drum_part)
+
+# Mix
+from daw_engine import DAWMixer
+mixer = DAWMixer()
+mixer.mix_project(project)
+
+# Save project
+project.save("my_track.json")
+```
+
+---
+
+## 📁 Project Structure
+
+```
+studio_onyrix/
+├── main.py                  # CLI entry point (DAW commands)
+├── daw_engine.py            # Core DAW: DAWPart, DAWProject, DAWPartGenerator, DAWMemory, DAWMixer
+├── modern_ai_generator.py   # MusicGen backend (Audio generation)
+├── requirements.txt         # Dependencies
+├── README.md                # This file
+│
+├── output/                  # Generated audio + project files
+│   ├── project.json         # Current project
+│   ├── *.wav                # Individual part audio
+│   └── *mix.wav             # Final mixed master
+│
+├── docs/                    # Documentation
+└── (legacy files: removed)
+```
+
+---
+
+## 🗑️ Legacy Files Removed
+
+The following MIDI-based files have been deprecated and removed:
+- `ai_midi_generator.py` - MidiBERT/MMM AI (weak)
+- `ai_prompt_parser.py` - Ollama prompt parser (obsolete)
+- `drums_bass.py`, `harmonic_engine.py`, `melody_engine.py` - MIDI generators
+- `audio_render.py` - MIDI-to-audio synth
+- `style_library.py`, `style_engine.py` - Style templates
+- `global_memory.py`, `utils.py` - MIDI utilities
+
+All replaced by `modern_ai_generator.py` + `daw_engine.py`.
+
+---
+
+## 🚀 Roadmap
+
+- **Loop Mode**: Repeat parts for verse/chorus structure
+- **MIDI Export**: Convert audio analysis to MIDI for editing
+- **Effects**: Real-time reverb, delay, compression
+- **Stem Separation**: Isolate generated parts into stems
+- **GUI**: PyQt/Tkinter DAW interface
+- **Multi-GPU**: Parallel part generation
+- **Audio Conditioning**: Start from audio reference
+
+---
+
+## 📝 Notes
+
+- MusicGen-small model (~300MB) auto-downloads on first use
+- GPU recommended for MusicGen-large (3GB)
+- CPU works for MusicGen-small (slower, ~30s for 15s audio)
+- All processing is LOCAL - zero cloud costs
+- Model cache: `~/.cache/huggingface/hub/`
+
+---
+
+**Studio Onyrix v4** - Build your music. One part at a time. 🎵
