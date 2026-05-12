@@ -88,25 +88,26 @@ def save_project():
 def cmd_new_project(args):
     """Create a new project."""
     global CURRENT_PROJECT
-    name = args[0] if args else input("Project name: ").strip() or "Untitled"
-    CURRENT_PROJECT = DAWProject(name=name)
+    kwargs = parse_flags(args)
+    positional = [a for a in args if not a.startswith("--")]
+    name = kwargs.get("name") or (positional[0] if positional else input("Project name: ").strip() or "Untitled")
+    CURRENT_PROJECT = DAWProject(
+        name=name,
+        bpm=int(kwargs.get("bpm", 120)),
+        division=kwargs.get("division", "4/4"),
+        root=kwargs.get("root", "C"),
+        scale=kwargs.get("scale", "natural_minor"),
+    )
     print(f"New project created: {name}")
 
 
-def cmd_add_part(args):
-    """
-    Add and generate a part.
-    
-    Usage: python main.py part --instrument 808_bass --bpm 140 --root C ...
-    """
-    # Parse arguments
+def parse_flags(args):
+    """Parse simple --key value flags used by the CLI and interactive shell."""
     kwargs = {}
-    
-    # Parse all --key value pairs
     i = 0
     while i < len(args):
         if args[i].startswith("--"):
-            key = args[i][2:]  # Remove --
+            key = args[i][2:]
             if i + 1 < len(args) and not args[i + 1].startswith("--"):
                 value = args[i + 1]
                 i += 2
@@ -116,6 +117,16 @@ def cmd_add_part(args):
             kwargs[key] = value
         else:
             i += 1
+    return kwargs
+
+
+def cmd_add_part(args):
+    """
+    Add and generate a part.
+    
+    Usage: python main.py part --instrument 808_bass --bpm 140 --root C ...
+    """
+    kwargs = parse_flags(args)
     
     # Map to DAWPart fields
     # Musical
@@ -127,6 +138,13 @@ def cmd_add_part(args):
     
     # Instrument
     instrument = kwargs.get('instrument', kwargs.get('preset', 'synth_pad'))
+    instr_info = INSTRUMENT_PRESETS.get(instrument, {})
+    instrument_class = instr_info.get('class', 'pad')
+    relation = kwargs.get('relation', 'verse')
+    volume = float(kwargs.get('volume', 0.8))
+    pan = float(kwargs.get('pan', 0.0))
+    start_bar = float(kwargs.get('start', kwargs.get('bar', 1.0)))
+    temperature = float(kwargs.get('temperature', 1.0))
     
     # If preset, load from presets
     if kwargs.get('preset'):
@@ -145,21 +163,28 @@ def cmd_add_part(args):
         if preset_name in preset_map:
             instr, iclass, vol, temp, rel = preset_map[preset_name]
             instrument = instr
+            instrument_class = iclass
+            relation = kwargs.get('relation', rel)
+            volume = float(kwargs.get('volume', vol))
+            temperature = float(kwargs.get('temperature', temp))
     
     # Get instrument info
     instr_info = INSTRUMENT_PRESETS.get(instrument, {})
-    instrument_class = instr_info.get('class', 'pad')
+    instrument_class = kwargs.get('class', instrument_class or instr_info.get('class', 'pad'))
     
-    # Arrangement
-    relation = kwargs.get('relation', 'verse')
-    
-    # Mixing
-    volume = float(kwargs.get('volume', 0.8))
-    pan = float(kwargs.get('pan', 0.0))
+    # Arrangement and project-level musical constraints
+    track_id = kwargs.get('track', '')
+    if kwargs.get('chords'):
+        CURRENT_PROJECT.chord_progression = [
+            c.strip() for c in kwargs['chords'].replace(",", " ").split() if c.strip()
+        ]
+    if kwargs.get('groove'):
+        CURRENT_PROJECT.groove = kwargs['groove']
+    if kwargs.get('swing'):
+        CURRENT_PROJECT.swing = float(kwargs['swing'])
     
     # AI params
     extra_prompt = kwargs.get('prompt', kwargs.get('extra', ''))
-    temperature = float(kwargs.get('temperature', 1.0))
     top_k = int(kwargs.get('top_k', 250))
     cfg_coef = float(kwargs.get('cfg', 3.0))
     
@@ -173,6 +198,8 @@ def cmd_add_part(args):
         instrument=instrument,
         instrument_class=instrument_class,
         relation=relation,
+        track_id=track_id,
+        start_bar=start_bar,
         volume=volume,
         pan=pan,
         extra_prompt=extra_prompt,
@@ -188,6 +215,7 @@ def cmd_add_part(args):
     print(f"\nPart [{index}] added to project: {part.instrument} ({part.relation})")
     print(f"  BPM: {part.bpm} | Division: {part.division}")
     print(f"  Key: {part.root} {part.scale} | Measures: {part.measures}")
+    print(f"  Track: {part.track_id} | Start bar: {part.start_bar:g} | End bar: {part.end_bar:g}")
     print(f"  Duration: {part.duration_seconds:.1f}s | Volume: {part.volume} | Pan: {part.pan}")
     if part.extra_prompt:
         print(f"  Extra: {part.extra_prompt}")
@@ -200,7 +228,7 @@ def cmd_add_part(args):
         print(f"\nGenerating part...")
         generator = get_generator()
         if generator.musicgen.available:
-            result = generator.generate_part(part)
+            result = generator.generate_part(part, project=CURRENT_PROJECT)
             if result['success']:
                 print(f"  Audio: {result['path']}")
                 if result['analysis']:
@@ -217,20 +245,22 @@ def cmd_list_parts(args):
     print(f"Project: {CURRENT_PROJECT.name}")
     print(f"BPM: {CURRENT_PROJECT.bpm} | Key: {CURRENT_PROJECT.root} {CURRENT_PROJECT.scale}")
     print(f"Division: {CURRENT_PROJECT.division}")
+    if CURRENT_PROJECT.chord_progression:
+        print(f"Chords: {' - '.join(CURRENT_PROJECT.chord_progression)}")
+    print(f"Groove: {CURRENT_PROJECT.groove} | Swing: {CURRENT_PROJECT.swing:.0%}")
     print(f"{'='*60}")
     
     if not CURRENT_PROJECT.parts:
         print("No parts in project.")
         return
     
-    print(f"\n{'#':<3} {'Instrument':<20} {'Section':<12} {'Bars':<5} {'Time':<10} {'Audio':<30}")
-    print(f"{'-'*80}")
+    print(f"\n{'#':<3} {'Track':<10} {'Instrument':<18} {'Section':<10} {'Start':<6} {'End':<6} {'Bars':<5} {'Audio':<24}")
+    print(f"{'-'*90}")
     
     for i, part in enumerate(CURRENT_PROJECT.parts):
         has_audio = "✓" if part.audio_path and os.path.exists(part.audio_path) else "✗"
-        dur = f"{part.duration_seconds:.1f}s" if part.duration > 0 else "-"
         audio_file = os.path.basename(part.audio_path) if part.audio_path else ""
-        print(f"{i:<3} {part.instrument:<20} {part.relation:<12} {part.measures:<5} {dur:<10} {audio_file:<30}")
+        print(f"{i:<3} {part.track_id:<10} {part.instrument:<18} {part.relation:<10} {part.start_bar:<6g} {part.end_bar:<6g} {part.measures:<5} {has_audio} {audio_file:<24}")
     
     print(f"\nTotal: {len(CURRENT_PROJECT.parts)} parts")
 
@@ -313,6 +343,43 @@ def cmd_scales(args):
         print(f"  {name:<20s} [{notes}]")
 
 
+def cmd_tracks(args):
+    """List mixer/timeline tracks."""
+    print(f"\n{'='*60}")
+    print("Tracks")
+    print(f"{'='*60}")
+    print(f"{'ID':<12} {'Name':<16} {'Class':<12} {'Vol':<6} {'Pan':<6} {'State':<10}")
+    print(f"{'-'*70}")
+    for track in CURRENT_PROJECT.tracks:
+        state = "solo" if track.solo else ("muted" if track.muted else "active")
+        print(f"{track.id:<12} {track.name:<16} {track.instrument_class:<12} {track.volume:<6.2f} {track.pan:<6.2f} {state:<10}")
+
+
+def cmd_arrangement(args):
+    """Set project-wide musical constraints for future generated parts."""
+    kwargs = parse_flags(args)
+    if kwargs.get('chords'):
+        CURRENT_PROJECT.chord_progression = [
+            c.strip() for c in kwargs['chords'].replace(",", " ").split() if c.strip()
+        ]
+    if kwargs.get('groove'):
+        CURRENT_PROJECT.groove = kwargs['groove']
+    if kwargs.get('swing'):
+        CURRENT_PROJECT.swing = float(kwargs['swing'])
+    if kwargs.get('bpm'):
+        CURRENT_PROJECT.bpm = int(kwargs['bpm'])
+    if kwargs.get('root'):
+        CURRENT_PROJECT.root = kwargs['root']
+    if kwargs.get('scale'):
+        CURRENT_PROJECT.scale = kwargs['scale']
+    save_project()
+    print("Arrangement updated.")
+    print(f"  BPM: {CURRENT_PROJECT.bpm}")
+    print(f"  Key: {CURRENT_PROJECT.root} {CURRENT_PROJECT.scale}")
+    print(f"  Chords: {' - '.join(CURRENT_PROJECT.chord_progression) if CURRENT_PROJECT.chord_progression else '-'}")
+    print(f"  Groove: {CURRENT_PROJECT.groove} | Swing: {CURRENT_PROJECT.swing:.0%}")
+
+
 def cmd_save(args):
     """Save project to file."""
     filepath = args[0] if args else PROJECT_FILE
@@ -350,7 +417,7 @@ def cmd_generate_all(args):
             continue
         
         print(f"\n  [{i}] Generating: {part.instrument} ({part.relation})...")
-        result = generator.generate_part(part)
+        result = generator.generate_part(part, project=CURRENT_PROJECT)
         if result['success']:
             print(f"    ✓ Audio saved")
         else:
@@ -368,6 +435,9 @@ def cmd_show(args):
     print(f"BPM: {CURRENT_PROJECT.bpm}")
     print(f"Division: {CURRENT_PROJECT.division}")
     print(f"Key: {CURRENT_PROJECT.root} {CURRENT_PROJECT.scale}")
+    print(f"Chords: {' - '.join(CURRENT_PROJECT.chord_progression) if CURRENT_PROJECT.chord_progression else '-'}")
+    print(f"Groove: {CURRENT_PROJECT.groove} | Swing: {CURRENT_PROJECT.swing:.0%}")
+    print(f"Tracks: {len(CURRENT_PROJECT.tracks)}")
     print(f"Parts: {len(CURRENT_PROJECT.parts)}")
     
     if CURRENT_PROJECT.parts:
@@ -381,7 +451,7 @@ def cmd_show(args):
             print(f"  {rel}: {', '.join(instrs)}")
         
         # Total duration
-        total = sum(p.duration_seconds for p in CURRENT_PROJECT.parts)
+        total = CURRENT_PROJECT.total_duration
         print(f"\nEstimated duration: {total:.1f}s ({total/60:.1f} min)")
 
 
@@ -403,6 +473,9 @@ def cmd_info(args):
         print(f"  ID: {part.id}")
         print(f"  Class: {part.instrument_class}")
         print(f"  Relation: {part.relation}")
+        print(f"  Track: {part.track_id}")
+        print(f"  Start bar: {part.start_bar:g}")
+        print(f"  End bar: {part.end_bar:g}")
         print(f"  BPM: {part.bpm}")
         print(f"  Division: {part.division}")
         print(f"  Key: {part.root} {part.scale}")
@@ -476,6 +549,12 @@ def cmd_interactive(args):
             
             elif command == 'scales':
                 cmd_scales(cmd_args)
+
+            elif command == 'tracks':
+                cmd_tracks(cmd_args)
+
+            elif command in ('arrangement', 'song'):
+                cmd_arrangement(cmd_args)
             
             elif command == 'save':
                 cmd_save(cmd_args)
@@ -526,11 +605,16 @@ ADDING PARTS:
       --root <C>                 Root/tonic note
       --scale <natural_minor>    Scale pattern
       --measures <8>             Number of bars
+      --start <1>                Timeline start bar
+      --track <bass>             Track/lane id
       --relation <verse>         Section type
       --volume <0.8>             Volume 0.0-1.0
       --pan <0.0>                Pan -1.0 to 1.0
       --temperature <1.0>        Creativity (0.5-1.5)
       --extra <text>             Extra prompt text
+      --chords "Am F C G"        Set shared chord progression
+      --groove <straight>        Set shared groove feel
+      --swing <0.15>             Set shared swing amount
       --generate <true>          Auto-generate audio
       
     Presets (shortcuts):
@@ -548,6 +632,8 @@ MIXING:
 INFORMATION:
   instruments                    List all instruments
   scales                         List all scales
+  tracks                         List project tracks
+  arrangement [flags]            Set BPM/key/chords/groove/swing
   help                           Show this help
   exit                           Save and quit
 """)
@@ -590,6 +676,10 @@ if __name__ == "__main__":
             cmd_instruments(cli_args)
         elif command == 'scales':
             cmd_scales(cli_args)
+        elif command == 'tracks':
+            cmd_tracks(cli_args)
+        elif command in ('arrangement', 'song'):
+            cmd_arrangement(cli_args)
         elif command == 'save':
             cmd_save(cli_args)
         elif command == 'load':

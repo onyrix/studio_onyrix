@@ -13,8 +13,6 @@ Key Concepts:
 
 import json
 import os
-import pickle
-import shutil
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
@@ -29,11 +27,37 @@ except ImportError:
     MUSICGEN_AVAILABLE = False
     print("Warning: MusicGen not available. Install transformers torchaudio")
 
+    class MusicGenGenerator:
+        """Fallback used when optional AI dependencies are not installed."""
+        def __init__(self, model_size: str = "small"):
+            self.model_size = model_size
+            self.available = False
+
+        def generate(self, *args, **kwargs):
+            return None
+
+    class AudioAnalyzer:
+        def __init__(self):
+            self.available = False
+
+        def analyze(self, *args, **kwargs) -> Dict:
+            return {}
+
 try:
     import soundfile as sf
     SOUNDFILE_AVAILABLE = True
 except ImportError:
     SOUNDFILE_AVAILABLE = False
+
+
+def _division_to_quarter_beats(division: str) -> float:
+    """Return measure length in quarter-note beats for a time signature."""
+    try:
+        numerator, denominator = division.split("/")
+        return int(numerator) * (4.0 / int(denominator))
+    except (ValueError, ZeroDivisionError):
+        return 4.0
+
 
 # ============================================================
 # MUSICAL THEORY CONSTANTS
@@ -296,6 +320,26 @@ class PartEffect:
 
 
 @dataclass
+class DAWTrack:
+    """
+    A mixer/timeline lane that can contain many generated parts.
+
+    Parts are routed here by track_id so drums, bass, chords and leads
+    can play at the same bar instead of becoming one long playlist.
+    """
+    id: str
+    name: str
+    instrument_class: str = "pad"
+    volume: float = 1.0
+    pan: float = 0.0
+    muted: bool = False
+    solo: bool = False
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+
+@dataclass
 class DAWPart:
     """
     A single instrument part in the DAW project.
@@ -318,6 +362,8 @@ class DAWPart:
     # Arrangement
     relation: str = "verse"
     order: int = 0  # Position in project
+    track_id: str = ""
+    start_bar: float = 1.0
     
     # Mixing
     volume: float = 0.8      # 0.0 to 1.0
@@ -346,13 +392,12 @@ class DAWPart:
             self.timestamp = datetime.now().isoformat()
     
     @property
-    def beats_per_measure(self) -> int:
-        """Get beats per measure from division string."""
-        parts = self.division.split("/")
-        return int(parts[0])
+    def beats_per_measure(self) -> float:
+        """Get measure length in quarter-note beats from division string."""
+        return _division_to_quarter_beats(self.division)
     
     @property
-    def total_beats(self) -> int:
+    def total_beats(self) -> float:
         """Total beats for this part."""
         return self.measures * self.beats_per_measure
     
@@ -360,6 +405,11 @@ class DAWPart:
     def duration_seconds(self) -> float:
         """Calculate duration in seconds based on BPM and measures."""
         return (self.total_beats / self.bpm) * 60.0
+
+    @property
+    def end_bar(self) -> float:
+        """One-based bar where this part ends."""
+        return self.start_bar + self.measures
     
     @property
     def scale_notes(self) -> List[str]:
@@ -411,6 +461,7 @@ class DAWPart:
             f"Time signature: {self.division}.",
             f"Tempo: {self.bpm} BPM.",
             f"Length: {self.measures} bars ({self.duration_seconds:.1f} seconds).",
+            f"Timeline position: starts at bar {self.start_bar:g}.",
             f"Key: {self.root} {self.scale.replace('_', ' ')}.",
             f"Scale notes: {scale_notes_str}.",
             f"Section: {context}.",
@@ -437,6 +488,9 @@ class DAWPart:
         
         if self.measures < 1:
             warnings.append(f"Measures must be >= 1, got {self.measures}")
+
+        if self.start_bar < 1:
+            warnings.append(f"Start bar must be >= 1, got {self.start_bar}")
         
         if self.volume < 0.0 or self.volume > 1.0:
             warnings.append(f"Volume must be 0-1, got {self.volume}")
@@ -464,6 +518,10 @@ class DAWProject:
     root: str = "C"
     scale: str = "natural_minor"
     parts: List[DAWPart] = field(default_factory=list)
+    tracks: List[DAWTrack] = field(default_factory=list)
+    chord_progression: List[str] = field(default_factory=list)
+    groove: str = "straight"
+    swing: float = 0.0
     created: str = ""
     modified: str = ""
     project_dir: str = ""
@@ -473,6 +531,85 @@ class DAWProject:
         if not self.created:
             self.created = now.isoformat()
         self.modified = now.isoformat()
+        if not self.tracks:
+            self._create_default_tracks()
+
+    def _create_default_tracks(self):
+        """Create the basic lanes a musician expects in a session."""
+        self.tracks = [
+            DAWTrack(id="drums", name="Drums", instrument_class="drums", volume=1.0),
+            DAWTrack(id="bass", name="Bass", instrument_class="bass", volume=0.9),
+            DAWTrack(id="chords", name="Chords", instrument_class="chords", volume=0.8),
+            DAWTrack(id="lead", name="Lead", instrument_class="lead", volume=0.85),
+            DAWTrack(id="fx", name="FX", instrument_class="fx", volume=0.8),
+        ]
+
+    def beats_per_bar(self) -> float:
+        return _division_to_quarter_beats(self.division)
+
+    def bar_to_seconds(self, bar: float) -> float:
+        """Convert a one-based bar number to seconds from project start."""
+        return max(0.0, (bar - 1.0) * self.beats_per_bar() * 60.0 / self.bpm)
+
+    def generation_context(self) -> str:
+        """Project-wide musical constraints for AI prompt coherence."""
+        context = [
+            f"Project tempo is {self.bpm} BPM.",
+            f"Project key is {self.root} {self.scale.replace('_', ' ')}.",
+            f"Project groove is {self.groove}.",
+        ]
+        if self.swing > 0:
+            context.append(f"Use about {self.swing:.0%} swing feel.")
+        if self.chord_progression:
+            context.append(
+                f"Follow this chord progression: {' - '.join(self.chord_progression)}."
+            )
+        return " ".join(context)
+
+    def find_track(self, track_id: str) -> Optional[DAWTrack]:
+        for track in self.tracks:
+            if track.id == track_id:
+                return track
+        return None
+
+    def add_track(self, name: str, instrument_class: str = "pad",
+                  track_id: Optional[str] = None) -> DAWTrack:
+        """Add a track if it does not already exist."""
+        clean_id = track_id or name.lower().strip().replace(" ", "_")
+        existing = self.find_track(clean_id)
+        if existing:
+            return existing
+
+        track = DAWTrack(id=clean_id, name=name, instrument_class=instrument_class)
+        self.tracks.append(track)
+        self.modified = datetime.now().isoformat()
+        return track
+
+    def route_for_part(self, part: DAWPart) -> DAWTrack:
+        """Find or create the right track lane for a part."""
+        if part.track_id:
+            track = self.find_track(part.track_id)
+            if track:
+                return track
+
+        class_to_track = {
+            "drums": "drums",
+            "percussion": "drums",
+            "bass": "bass",
+            "chords": "chords",
+            "pad": "chords",
+            "arpeggio": "chords",
+            "melody": "lead",
+            "lead": "lead",
+            "vocals": "lead",
+            "fx": "fx",
+        }
+        track_id = class_to_track.get(part.instrument_class, part.instrument_class)
+        track = self.find_track(track_id)
+        if not track:
+            track = self.add_track(track_id.title(), part.instrument_class, track_id)
+        part.track_id = track.id
+        return track
     
     def add_part(self, part: DAWPart) -> int:
         """
@@ -488,6 +625,8 @@ class DAWProject:
             part.root = self.root
         if part.scale == "natural_minor" and self.scale != "natural_minor":
             part.scale = self.scale
+
+        self.route_for_part(part)
         
         part.order = len(self.parts)
         self.parts.append(part)
@@ -516,7 +655,7 @@ class DAWProject:
         """Calculate total duration of all parts (worst case)."""
         max_end = 0
         for part in self.parts:
-            end = (part.order + 1) * part.duration_seconds
+            end = self.bar_to_seconds(part.end_bar)
             max_end = max(max_end, end)
         return max_end
     
@@ -529,9 +668,13 @@ class DAWProject:
                 'division': self.division,
                 'root': self.root,
                 'scale': self.scale,
+                'chord_progression': self.chord_progression,
+                'groove': self.groove,
+                'swing': self.swing,
                 'created': self.created,
                 'modified': datetime.now().isoformat(),
             },
+            'tracks': [t.to_dict() for t in self.tracks],
             'parts': [p.to_dict() for p in self.parts],
         }
         
@@ -554,9 +697,15 @@ class DAWProject:
             division=proj_data.get('division', '4/4'),
             root=proj_data.get('root', 'C'),
             scale=proj_data.get('scale', 'natural_minor'),
+            chord_progression=proj_data.get('chord_progression', []),
+            groove=proj_data.get('groove', 'straight'),
+            swing=proj_data.get('swing', 0.0),
             created=proj_data.get('created', ''),
             project_dir=os.path.dirname(filepath),
         )
+
+        if data.get('tracks'):
+            project.tracks = [DAWTrack(**track_data) for track_data in data['tracks']]
         
         for part_data in data.get('parts', []):
             effects = []
@@ -567,7 +716,9 @@ class DAWProject:
                     params=ef.get('params', {}),
                 ))
             part_data['effects'] = effects
-            project.parts.append(DAWPart(**part_data))
+            part = DAWPart(**part_data)
+            project.route_for_part(part)
+            project.parts.append(part)
         
         print(f"Project loaded: {filepath}")
         print(f"  Parts: {len(project.parts)}")
@@ -691,7 +842,8 @@ class DAWPartGenerator:
         print(f"  Audio Analysis: {'READY' if (self.analyzer and self.analyzer.available) else 'NOT AVAILABLE'}")
         print(f"{'='*60}\n")
     
-    def generate_part(self, part: DAWPart, output_dir: str = "output") -> Dict:
+    def generate_part(self, part: DAWPart, output_dir: str = "output",
+                      project: Optional[DAWProject] = None) -> Dict:
         """
         Generate audio for a single part.
         
@@ -724,8 +876,9 @@ class DAWPartGenerator:
         # Build prompt with context from memory
         prompt = part.build_prompt()
         context = self.memory.get_context_for(part)
-        if context:
-            full_prompt = f"{prompt} {context}"
+        project_context = project.generation_context() if project else ""
+        if context or project_context:
+            full_prompt = " ".join(p for p in [prompt, project_context, context] if p)
         else:
             full_prompt = prompt
         
@@ -736,8 +889,11 @@ class DAWPartGenerator:
         print(f"  Key: {part.root} {part.scale}")
         print(f"  Measures: {part.measures} ({part.duration_seconds:.1f}s)")
         print(f"  Relation: {part.relation}")
+        print(f"  Track: {part.track_id or '-'} | Start bar: {part.start_bar:g}")
         print(f"  Pitch/Temperature: {part.temperature}")
         print(f"  Prompt: {prompt}")
+        if project_context:
+            print(f"  Project: {project_context}")
         if context:
             print(f"  Context: {context}")
         print(f"{'='*50}")
@@ -846,9 +1002,9 @@ class DAWPartGenerator:
 
 class DAWMixer:
     """
-    Simple mixer for combining multiple parts into a final mix.
+    Timeline mixer for combining generated parts into a final mix.
     
-    Mixes parts with volume, pan, and crossfade between sections.
+    Mixes parts by track and start bar, so clips can overlap like a DAW.
     """
     
     def __init__(self, sample_rate: int = 32000):
@@ -858,43 +1014,52 @@ class DAWMixer:
         """
         Mix all parts in a project into a single WAV file.
         
-        Aligns parts by their order, creating a timeline.
+        Aligns parts by start_bar and routes them through track volume/pan.
         """
+        if not SOUNDFILE_AVAILABLE:
+            print("soundfile is required for mixing. Install soundfile.")
+            return ""
+
         if not project.parts:
             print("No parts to mix.")
             return ""
         
-        # Calculate total timeline length
         timeline_end = 0
-        current_time = 0
-        timeline: List[Tuple[int, DAWPart, float]] = []  # (sample_start, part, volume)
+        timeline: List[Tuple[int, np.ndarray]] = []
+        solo_tracks = {t.id for t in project.tracks if t.solo}
         
         for i, part in enumerate(project.parts):
             if not part.audio_path or not os.path.exists(part.audio_path):
                 print(f"Part {i} ({part.id}) has no audio, skipping.")
                 continue
+
+            track = project.find_track(part.track_id)
+            if track and track.muted:
+                print(f"Part {i} ({part.id}) skipped because track {track.name} is muted.")
+                continue
+            if solo_tracks and (not track or track.id not in solo_tracks):
+                continue
             
-            # Read audio
             audio, sr = sf.read(part.audio_path)
             if sr != self.sample_rate:
-                # Resample (simplified)
-                pass
+                audio = self._resample(audio, sr, self.sample_rate)
             
-            # Ensure stereo
             if audio.ndim == 1:
                 audio = np.column_stack([audio, audio])
+            elif audio.shape[1] > 2:
+                audio = audio[:, :2]
             
-            # Apply volume and pan
-            left_gain = part.volume * (1.0 - max(0, part.pan))
-            right_gain = part.volume * (1.0 - max(0, -part.pan))
+            track_volume = track.volume if track else 1.0
+            track_pan = track.pan if track else 0.0
+            combined_pan = max(-1.0, min(1.0, part.pan + track_pan))
+            gain = part.volume * track_volume
+            left_gain = gain * (1.0 - max(0, combined_pan))
+            right_gain = gain * (1.0 - max(0, -combined_pan))
             audio[:, 0] *= left_gain
             audio[:, 1] *= right_gain
             
-            # Align to timeline
-            start_sample = int(current_time * self.sample_rate)
+            start_sample = int(project.bar_to_seconds(part.start_bar) * self.sample_rate)
             timeline.append((start_sample, audio))
-            
-            current_time += part.duration_seconds
             timeline_end = max(timeline_end, start_sample + audio.shape[0])
         
         if not timeline:
@@ -908,10 +1073,11 @@ class DAWMixer:
             span = end - start_sample
             master[start_sample:end] += audio_data[:span]
         
-        # Normalize
+        # Normalize and apply a simple soft limiter for stacked AI stems.
         max_val = np.max(np.abs(master))
         if max_val > 1.0:
             master /= max_val
+        master = np.tanh(master * 0.98)
         
         # Save
         os.makedirs(output_dir, exist_ok=True)
@@ -922,6 +1088,25 @@ class DAWMixer:
         print(f"  Parts: {len(timeline)}")
         
         return output_path
+
+    def _resample(self, audio: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
+        """Lightweight linear resampler to avoid silent sample-rate mismatch bugs."""
+        if source_rate == target_rate:
+            return audio
+
+        source_len = audio.shape[0]
+        target_len = int(source_len * target_rate / source_rate)
+        source_x = np.linspace(0.0, 1.0, source_len, endpoint=False)
+        target_x = np.linspace(0.0, 1.0, target_len, endpoint=False)
+
+        if audio.ndim == 1:
+            return np.interp(target_x, source_x, audio).astype(np.float32)
+
+        channels = [
+            np.interp(target_x, source_x, audio[:, ch])
+            for ch in range(audio.shape[1])
+        ]
+        return np.column_stack(channels).astype(np.float32)
 
 
 # ============================================================
