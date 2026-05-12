@@ -334,9 +334,12 @@ class DAWTrack:
     pan: float = 0.0
     muted: bool = False
     solo: bool = False
+    effects: List[PartEffect] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
-        return asdict(self)
+        d = asdict(self)
+        d['effects'] = [asdict(e) for e in self.effects]
+        return d
 
 
 @dataclass
@@ -513,6 +516,7 @@ class DAWProject:
     - Project file save/load
     """
     name: str = "Untitled"
+    schema_version: str = "0.5"
     bpm: int = 120
     division: str = "4/4"
     root: str = "C"
@@ -522,6 +526,12 @@ class DAWProject:
     chord_progression: List[str] = field(default_factory=list)
     groove: str = "straight"
     swing: float = 0.0
+    style_tags: List[str] = field(default_factory=list)
+    description: str = ""
+    master_volume: float = 1.0
+    master_effects: List[PartEffect] = field(default_factory=list)
+    render_settings: Dict[str, Any] = field(default_factory=dict)
+    memory: Dict[str, Any] = field(default_factory=dict)
     created: str = ""
     modified: str = ""
     project_dir: str = ""
@@ -533,6 +543,27 @@ class DAWProject:
         self.modified = now.isoformat()
         if not self.tracks:
             self._create_default_tracks()
+        if not self.render_settings:
+            self.render_settings = {
+                "sample_rate": 32000,
+                "channels": 2,
+                "format": "wav",
+                "bit_depth": "float32",
+            }
+        if not self.memory:
+            self.memory = self._empty_memory()
+
+    def _empty_memory(self) -> Dict[str, Any]:
+        """Persistent creative memory for AI generation and future UI state."""
+        return {
+            "intent": "",
+            "references": [],
+            "generation_history": [],
+            "motifs": [],
+            "sections": {},
+            "instrument_roles": {},
+            "warnings": [],
+        }
 
     def _create_default_tracks(self):
         """Create the basic lanes a musician expects in a session."""
@@ -658,25 +689,127 @@ class DAWProject:
             end = self.bar_to_seconds(part.end_bar)
             max_end = max(max_end, end)
         return max_end
+
+    def audio_assets(self) -> List[Dict[str, Any]]:
+        """Collect render assets referenced by parts without embedding audio data."""
+        assets = []
+        for part in self.parts:
+            if not part.audio_path:
+                continue
+            assets.append({
+                "id": f"audio_{part.id}",
+                "part_id": part.id,
+                "track_id": part.track_id,
+                "path": part.audio_path,
+                "type": "audio",
+                "format": os.path.splitext(part.audio_path)[1].lstrip(".") or "wav",
+                "duration_seconds": part.duration or part.duration_seconds,
+                "sample_rate": self.render_settings.get("sample_rate", 32000),
+            })
+        return assets
+
+    def midi_assets(self) -> List[Dict[str, Any]]:
+        """Placeholder for v0.5+ MIDI clips once note generation is improved."""
+        assets = []
+        for part in self.parts:
+            midi_path = part.analysis.get("midi_path") if isinstance(part.analysis, dict) else None
+            if not midi_path:
+                continue
+            assets.append({
+                "id": f"midi_{part.id}",
+                "part_id": part.id,
+                "track_id": part.track_id,
+                "path": midi_path,
+                "type": "midi",
+                "format": "mid",
+            })
+        return assets
+
+    def record_generation(self, part: DAWPart, prompt: str,
+                          audio_path: str = "", analysis: Optional[Dict] = None,
+                          warnings: Optional[List[str]] = None):
+        """Persist AI generation memory inside the project JSON."""
+        if not self.memory:
+            self.memory = self._empty_memory()
+
+        event = {
+            "timestamp": datetime.now().isoformat(),
+            "part_id": part.id,
+            "track_id": part.track_id,
+            "instrument": part.instrument,
+            "instrument_class": part.instrument_class,
+            "relation": part.relation,
+            "start_bar": part.start_bar,
+            "measures": part.measures,
+            "prompt": prompt,
+            "audio_path": audio_path,
+            "analysis": analysis or {},
+            "warnings": warnings or [],
+        }
+        self.memory.setdefault("generation_history", []).append(event)
+        self.memory.setdefault("sections", {}).setdefault(part.relation, []).append(part.id)
+        self.memory.setdefault("instrument_roles", {})[part.track_id] = {
+            "instrument": part.instrument,
+            "class": part.instrument_class,
+            "role": part.relation,
+        }
+        if warnings:
+            self.memory.setdefault("warnings", []).extend(warnings)
+        self.modified = datetime.now().isoformat()
+
+    def to_project_document(self) -> Dict[str, Any]:
+        """
+        Export the v0.5 source-of-truth document for the future DAW UI.
+
+        This is intentionally more explicit than the dataclasses: UI code should
+        be able to reconstruct transport, musical intent, timeline and assets
+        without knowing Python internals.
+        """
+        modified = datetime.now().isoformat()
+        return {
+            "schema_version": self.schema_version,
+            "application": "Studio Onyrix",
+            "project": {
+                "name": self.name,
+                "description": self.description,
+                "style_tags": self.style_tags,
+                "created": self.created,
+                "modified": modified,
+            },
+            "transport": {
+                "bpm": self.bpm,
+                "division": self.division,
+                "beats_per_bar": self.beats_per_bar(),
+                "duration_seconds": self.total_duration,
+            },
+            "musical_context": {
+                "root": self.root,
+                "scale": self.scale,
+                "scale_notes": [
+                    NOTE_NAMES[(NOTE_NAMES.index(self.root) + i) % 12]
+                    for i in SCALE_PATTERNS.get(self.scale, SCALE_PATTERNS["natural_minor"])
+                ] if self.root in NOTE_NAMES else [],
+                "chord_progression": self.chord_progression,
+                "groove": self.groove,
+                "swing": self.swing,
+            },
+            "render_settings": self.render_settings,
+            "master": {
+                "volume": self.master_volume,
+                "effects": [asdict(e) for e in self.master_effects],
+            },
+            "tracks": [t.to_dict() for t in self.tracks],
+            "parts": [p.to_dict() for p in self.parts],
+            "assets": {
+                "audio": self.audio_assets(),
+                "midi": self.midi_assets(),
+            },
+            "memory": self.memory or self._empty_memory(),
+        }
     
     def save(self, filepath: str):
         """Save project to JSON file."""
-        data = {
-            'project': {
-                'name': self.name,
-                'bpm': self.bpm,
-                'division': self.division,
-                'root': self.root,
-                'scale': self.scale,
-                'chord_progression': self.chord_progression,
-                'groove': self.groove,
-                'swing': self.swing,
-                'created': self.created,
-                'modified': datetime.now().isoformat(),
-            },
-            'tracks': [t.to_dict() for t in self.tracks],
-            'parts': [p.to_dict() for p in self.parts],
-        }
+        data = self.to_project_document()
         
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2, default=str)
@@ -690,32 +823,53 @@ class DAWProject:
         with open(filepath, 'r') as f:
             data = json.load(f)
         
+        schema_version = data.get('schema_version', '0.4')
         proj_data = data.get('project', {})
+        transport = data.get('transport', proj_data)
+        musical_context = data.get('musical_context', proj_data)
+        master = data.get('master', {})
+
+        def decode_effects(raw_effects: List[Dict[str, Any]]) -> List[PartEffect]:
+            effects = []
+            for ef in raw_effects:
+                effect_type = ef.get('type', EffectType.REVERB)
+                effects.append(PartEffect(
+                    type=EffectType(effect_type),
+                    amount=ef.get('amount', 0.5),
+                    params=ef.get('params', {}),
+                ))
+            return effects
+
         project = cls(
             name=proj_data.get('name', 'Untitled'),
-            bpm=proj_data.get('bpm', 120),
-            division=proj_data.get('division', '4/4'),
-            root=proj_data.get('root', 'C'),
-            scale=proj_data.get('scale', 'natural_minor'),
-            chord_progression=proj_data.get('chord_progression', []),
-            groove=proj_data.get('groove', 'straight'),
-            swing=proj_data.get('swing', 0.0),
+            schema_version=schema_version,
+            bpm=transport.get('bpm', 120),
+            division=transport.get('division', '4/4'),
+            root=musical_context.get('root', 'C'),
+            scale=musical_context.get('scale', 'natural_minor'),
+            chord_progression=musical_context.get('chord_progression', []),
+            groove=musical_context.get('groove', 'straight'),
+            swing=musical_context.get('swing', 0.0),
+            style_tags=proj_data.get('style_tags', []),
+            description=proj_data.get('description', ''),
+            master_volume=master.get('volume', 1.0),
+            master_effects=decode_effects(master.get('effects', [])),
+            render_settings=data.get('render_settings', {}),
+            memory=data.get('memory', {}),
             created=proj_data.get('created', ''),
             project_dir=os.path.dirname(filepath),
         )
 
         if data.get('tracks'):
-            project.tracks = [DAWTrack(**track_data) for track_data in data['tracks']]
+            project.tracks = []
+            for track_data in data['tracks']:
+                track_data = dict(track_data)
+                track_data['effects'] = decode_effects(track_data.get('effects', []))
+                project.tracks.append(DAWTrack(**track_data))
         
         for part_data in data.get('parts', []):
-            effects = []
-            for ef in part_data.pop('effects', []):
-                effects.append(PartEffect(
-                    type=EffectType(ef['type']),
-                    amount=ef.get('amount', 0.5),
-                    params=ef.get('params', {}),
-                ))
-            part_data['effects'] = effects
+            part_data = dict(part_data)
+            part_data['effects'] = decode_effects(part_data.pop('effects', []))
             part = DAWPart(**part_data)
             project.route_for_part(part)
             project.parts.append(part)
@@ -943,6 +1097,14 @@ class DAWPartGenerator:
         
         # Record in memory
         self.memory.record_part(part, part.audio_path, result['analysis'])
+        if project:
+            project.record_generation(
+                part=part,
+                prompt=full_prompt,
+                audio_path=part.audio_path,
+                analysis=result['analysis'],
+                warnings=result['warnings'],
+            )
         self.generation_count += 1
         
         result['success'] = True
@@ -1077,6 +1239,7 @@ class DAWMixer:
         max_val = np.max(np.abs(master))
         if max_val > 1.0:
             master /= max_val
+        master *= project.master_volume
         master = np.tanh(master * 0.98)
         
         # Save
