@@ -1,9 +1,16 @@
--- install
+Studio Onyrix v0.5
 
-pip install pretty_midi mido numpy
-pip install fluidsynth
+Install:
+  pip install -r requirements.txt
 
+Run a full parametric song export:
+  python main.py compose --style trap --name TrapNoir --output output/songs/trap_noir
 
--- run
+Run tests:
+  python -m unittest test_v05_exports.py
 
-python main.py
+Open outputs:
+  output/songs/<style>/project.json
+  output/songs/<style>/song.mid
+  output/songs/<style>/song.wav
+  output/songs/<style>/midi_tracks/*.mid

@@ -44,6 +44,8 @@ from daw_engine import (
     create_chord_part, create_melody_part,
     InstrumentClass, PartRelation, TimeDivision,
 )
+from v05_renderer import OfflineSongRenderer
+from v05_song_factory import available_styles, create_song_project
 
 
 # ============================================================
@@ -393,6 +395,53 @@ def cmd_arrangement(args):
     print(f"  Style: {', '.join(CURRENT_PROJECT.style_tags) if CURRENT_PROJECT.style_tags else '-'}")
 
 
+def cmd_compose_song(args):
+    """Create a full parametric song and export JSON, MIDI stems and WAV preview."""
+    global CURRENT_PROJECT
+    kwargs = parse_flags(args)
+    style = kwargs.get('style', args[0] if args and not args[0].startswith("--") else 'trap')
+    if style not in available_styles():
+        print(f"Unknown style: {style}")
+        print(f"Available styles: {', '.join(available_styles())}")
+        return
+
+    chords = None
+    if kwargs.get('chords'):
+        chords = [c.strip() for c in kwargs['chords'].replace(",", " ").split() if c.strip()]
+
+    CURRENT_PROJECT = create_song_project(
+        style=style,
+        name=kwargs.get('name', f"{style.title()} Song"),
+        bpm=int(kwargs['bpm']) if kwargs.get('bpm') else None,
+        root=kwargs.get('root'),
+        scale=kwargs.get('scale'),
+        chords=chords,
+        measures=int(kwargs['measures']) if kwargs.get('measures') else None,
+    )
+
+    output_dir = kwargs.get('output', os.path.join("output", "songs", style))
+    renderer = OfflineSongRenderer(
+        sample_rate=int(CURRENT_PROJECT.render_settings.get("sample_rate", 32000))
+    )
+    paths = renderer.render_project(CURRENT_PROJECT, output_dir)
+    save_project()
+
+    track_midis = [path for key, path in paths.items() if key.startswith("midi_")]
+    print(f"\nSong generated: {CURRENT_PROJECT.name}")
+    print(f"  Style: {style}")
+    print(f"  Project JSON: {paths['json']}")
+    print(f"  Master MIDI: {paths['midi']}")
+    print(f"  Track MIDIs: {len(track_midis)} files")
+    print(f"  WAV preview: {paths['wav']}")
+
+
+def cmd_styles(args):
+    """List parametric song styles."""
+    print("\nAvailable v0.5 song styles:")
+    for style in available_styles():
+        print(f"  {style}")
+
+
 def cmd_project_json(args):
     """Export or print the v0.5 project JSON document."""
     kwargs = parse_flags(args)
@@ -591,8 +640,14 @@ def cmd_interactive(args):
             elif command == 'tracks':
                 cmd_tracks(cmd_args)
 
-            elif command in ('arrangement', 'song'):
+            elif command == 'arrangement':
                 cmd_arrangement(cmd_args)
+
+            elif command in ('compose', 'song'):
+                cmd_compose_song(cmd_args)
+
+            elif command == 'styles':
+                cmd_styles(cmd_args)
 
             elif command in ('json', 'export'):
                 cmd_project_json(cmd_args)
@@ -633,6 +688,16 @@ Studio Onyrix v0.5 - Commands
 
 PROJECT:
   new [name]                     Create a new project
+  compose --style <trap>         Generate full project + MIDI stems + WAV
+    Compose flags:
+      --style <trap>             trap, synthwave, lofi, rock
+      --name <SongName>          Project name
+      --bpm <140>                Override style BPM
+      --root <A>                 Override root note
+      --scale <natural_minor>    Override scale
+      --chords "Am F C G"        Override chord progression
+      --measures <24>            Scale arrangement to total bars
+      --output <folder>          Export folder
   load <file>                    Load project from file
   save [file]                    Save project to file
   json [file]                    Export v0.5 project JSON
@@ -676,6 +741,7 @@ MIXING:
 INFORMATION:
   instruments                    List all instruments
   scales                         List all scales
+  styles                         List full-song style presets
   tracks                         List project tracks
   arrangement [flags]            Set BPM/key/chords/groove/style
   help                           Show this help
@@ -704,6 +770,8 @@ if __name__ == "__main__":
         
         if command == 'new':
             cmd_new_project(cli_args)
+        elif command in ('compose', 'song'):
+            cmd_compose_song(cli_args)
         elif command == 'part':
             cmd_add_part(cli_args)
         elif command in ('add', 'gen'):
@@ -722,8 +790,10 @@ if __name__ == "__main__":
             cmd_scales(cli_args)
         elif command == 'tracks':
             cmd_tracks(cli_args)
-        elif command in ('arrangement', 'song'):
+        elif command == 'arrangement':
             cmd_arrangement(cli_args)
+        elif command == 'styles':
+            cmd_styles(cli_args)
         elif command in ('json', 'export'):
             cmd_project_json(cli_args)
         elif command == 'save':

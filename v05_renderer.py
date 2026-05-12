@@ -48,18 +48,21 @@ class OfflineSongRenderer:
         os.makedirs(output_dir, exist_ok=True)
         events = self.build_events(project)
 
-        midi_path = os.path.join(output_dir, "song.mid")
+        midi_master_path = os.path.join(output_dir, "song.mid")
+        midi_track_paths = self._track_midi_paths(project, output_dir)
         wav_path = os.path.join(output_dir, "song.wav")
         project_path = os.path.join(output_dir, "project.json")
 
-        self.write_midi(project, events, midi_path)
+        self.write_midi(project, events, midi_master_path)
+        self.write_track_midis(project, events, midi_track_paths)
         self.write_wav(project, events, wav_path)
+        project.render_settings["master_audio_path"] = wav_path
 
         for part in project.parts:
-            part.analysis["midi_path"] = midi_path
+            part.analysis["midi_master_path"] = midi_master_path
+            if part.track_id in midi_track_paths:
+                part.analysis["midi_track_path"] = midi_track_paths[part.track_id]
             part.analysis["offline_renderer"] = "v0.5"
-            if not part.audio_path:
-                part.audio_path = wav_path
             if not part.duration:
                 part.duration = part.duration_seconds
             project.record_generation(
@@ -71,7 +74,10 @@ class OfflineSongRenderer:
             )
 
         project.save(project_path)
-        return {"json": project_path, "midi": midi_path, "wav": wav_path}
+        paths = {"json": project_path, "midi": midi_master_path, "wav": wav_path}
+        for track_id, track_path in midi_track_paths.items():
+            paths[f"midi_{track_id}"] = track_path
+        return paths
 
     def build_events(self, project: DAWProject) -> List[NoteEvent]:
         events: List[NoteEvent] = []
@@ -178,6 +184,29 @@ class OfflineSongRenderer:
             f.write(header)
             for track_data in tracks:
                 f.write(b"MTrk" + struct.pack(">I", len(track_data)) + track_data)
+
+    def write_track_midis(self, project: DAWProject, events: List[NoteEvent],
+                          track_paths: Dict[str, str]):
+        by_track: Dict[str, List[NoteEvent]] = {}
+        for event in events:
+            by_track.setdefault(event.track_id, []).append(event)
+
+        for track in project.tracks:
+            track_events = by_track.get(track.id, [])
+            if not track_events:
+                continue
+            track_project = DAWProject(
+                name=f"{project.name} - {track.name}",
+                bpm=project.bpm,
+                division=project.division,
+                root=project.root,
+                scale=project.scale,
+                chord_progression=project.chord_progression,
+                groove=project.groove,
+                swing=project.swing,
+            )
+            track_project.tracks = [track]
+            self.write_midi(track_project, track_events, track_paths[track.id])
 
     def write_wav(self, project: DAWProject, events: List[NoteEvent], filepath: str):
         duration = max(project.total_duration, 1.0) + 0.25
@@ -289,6 +318,14 @@ class OfflineSongRenderer:
     def _track_pan(self, project: DAWProject, track_id: str) -> float:
         track = project.find_track(track_id)
         return track.pan if track else 0.0
+
+    def _track_midi_paths(self, project: DAWProject, output_dir: str) -> Dict[str, str]:
+        midi_dir = os.path.join(output_dir, "midi_tracks")
+        os.makedirs(midi_dir, exist_ok=True)
+        return {
+            track.id: os.path.join(midi_dir, f"{track.id}.mid")
+            for track in project.tracks
+        }
 
     def _time_signature(self, division: str) -> Tuple[int, int]:
         try:

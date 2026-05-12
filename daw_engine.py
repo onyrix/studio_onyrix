@@ -693,15 +693,32 @@ class DAWProject:
     def audio_assets(self) -> List[Dict[str, Any]]:
         """Collect render assets referenced by parts without embedding audio data."""
         assets = []
+        seen = set()
+        master_audio_path = self.render_settings.get("master_audio_path")
+        if master_audio_path:
+            seen.add(master_audio_path)
+            assets.append({
+                "id": "audio_master",
+                "part_id": "",
+                "track_id": "",
+                "path": master_audio_path,
+                "type": "audio",
+                "scope": "master",
+                "format": os.path.splitext(master_audio_path)[1].lstrip(".") or "wav",
+                "duration_seconds": self.total_duration,
+                "sample_rate": self.render_settings.get("sample_rate", 32000),
+            })
         for part in self.parts:
-            if not part.audio_path:
+            if not part.audio_path or part.audio_path in seen:
                 continue
+            seen.add(part.audio_path)
             assets.append({
                 "id": f"audio_{part.id}",
                 "part_id": part.id,
                 "track_id": part.track_id,
                 "path": part.audio_path,
                 "type": "audio",
+                "scope": "part",
                 "format": os.path.splitext(part.audio_path)[1].lstrip(".") or "wav",
                 "duration_seconds": part.duration or part.duration_seconds,
                 "sample_rate": self.render_settings.get("sample_rate", 32000),
@@ -709,20 +726,31 @@ class DAWProject:
         return assets
 
     def midi_assets(self) -> List[Dict[str, Any]]:
-        """Placeholder for v0.5+ MIDI clips once note generation is improved."""
+        """Collect MIDI assets, including master and per-track exports."""
         assets = []
+        seen = set()
         for part in self.parts:
-            midi_path = part.analysis.get("midi_path") if isinstance(part.analysis, dict) else None
-            if not midi_path:
+            if not isinstance(part.analysis, dict):
                 continue
-            assets.append({
-                "id": f"midi_{part.id}",
-                "part_id": part.id,
-                "track_id": part.track_id,
-                "path": midi_path,
-                "type": "midi",
-                "format": "mid",
-            })
+            midi_specs = [
+                ("master", part.analysis.get("midi_master_path"), "project"),
+                ("track", part.analysis.get("midi_track_path"), part.track_id),
+                ("part", part.analysis.get("midi_path"), part.id),
+            ]
+            for scope, midi_path, owner in midi_specs:
+                if not midi_path or midi_path in seen:
+                    continue
+                seen.add(midi_path)
+                assets.append({
+                    "id": f"midi_{scope}_{owner}",
+                    "part_id": part.id if scope == "part" else "",
+                    "track_id": part.track_id if scope in ("track", "part") else "",
+                    "path": midi_path,
+                    "type": "midi",
+                    "scope": scope,
+                    "owner": owner,
+                    "format": "mid",
+                })
         return assets
 
     def record_generation(self, part: DAWPart, prompt: str,

@@ -1,16 +1,14 @@
 # Studio Onyrix v0.5 - AI-Powered DAW Project System
 #
 # Install: pip install -r requirements.txt
-# Modern AI (MusicGen): pip install transformers torchaudio
-# Full: pip install torch torchaudio transformers librosa soundfile numpy
+# Offline v0.5 export works with numpy only.
+# Optional MusicGen: pip install torch torchaudio transformers
 
 # Core dependencies
 numpy>=1.21.0
 soundfile>=0.12.1
 
-# Modern AI - MusicGen (Meta/HuggingFace)
-# pip install torch torchaudio
-# pip install transformers
+# Optional modern AI - MusicGen (Meta/HuggingFace)
 transformers>=4.31.0
 
 # Audio analysis

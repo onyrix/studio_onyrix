@@ -3,8 +3,8 @@ import os
 import unittest
 import wave
 
-from daw_engine import DAWPart, DAWProject
 from v05_renderer import OfflineSongRenderer
+from v05_song_factory import create_song_project
 
 
 OUTPUT_ROOT = os.path.join("output", "v05_test_songs")
@@ -59,73 +59,21 @@ SONG_FIXTURES = [
 
 
 def build_project(config):
-    project = DAWProject(
+    style = {
+        "trap_noir": "trap",
+        "neon_synthwave": "synthwave",
+        "lofi_sunset": "lofi",
+        "garage_rock": "rock",
+    }[config["slug"]]
+    return create_song_project(
+        style=style,
         name=config["name"],
         bpm=config["bpm"],
         root=config["root"],
         scale=config["scale"],
-        chord_progression=config["chords"],
-        groove=config["groove"],
-        swing=config["swing"],
-        style_tags=config["style"],
-        description=f"v0.5 export test fixture for {config['name']}",
+        chords=config["chords"],
+        measures=24,
     )
-
-    project.find_track("bass").pan = -0.10
-    project.find_track("chords").pan = 0.12
-    project.find_track("lead").pan = 0.20
-
-    slug = config["slug"]
-    common = {
-        "bpm": project.bpm,
-        "root": project.root,
-        "scale": project.scale,
-    }
-    project.add_part(DAWPart(
-        **common,
-        id=f"{slug}_drums",
-        instrument="trap_drums" if config["groove"] == "trap" else "drums_full",
-        instrument_class="drums",
-        track_id="drums",
-        start_bar=1,
-        measures=8,
-        relation="verse",
-        extra_prompt=f"{config['groove']} drums",
-    ))
-    project.add_part(DAWPart(
-        **common,
-        id=f"{slug}_bass",
-        instrument="808_bass" if config["groove"] == "trap" else "synth_bass",
-        instrument_class="bass",
-        track_id="bass",
-        start_bar=1,
-        measures=8,
-        relation="verse",
-        extra_prompt="follow chord roots tightly",
-    ))
-    project.add_part(DAWPart(
-        **common,
-        id=f"{slug}_chords",
-        instrument="synth_pad" if config["groove"] != "rock" else "piano",
-        instrument_class="chords",
-        track_id="chords",
-        start_bar=1,
-        measures=8,
-        relation="verse",
-        extra_prompt="clear harmonic bed",
-    ))
-    project.add_part(DAWPart(
-        **common,
-        id=f"{slug}_lead",
-        instrument="synth_lead" if config["groove"] != "rock" else "guitar_melody",
-        instrument_class="lead",
-        track_id="lead",
-        start_bar=5,
-        measures=4,
-        relation="chorus",
-        extra_prompt="short memorable hook",
-    ))
-    return project
 
 
 class V05ExportTests(unittest.TestCase):
@@ -140,7 +88,8 @@ class V05ExportTests(unittest.TestCase):
 
                 for path in paths.values():
                     self.assertTrue(os.path.exists(path), path)
-                    self.assertGreater(os.path.getsize(path), 128, path)
+                    min_size = 64 if path.endswith(".mid") else 128
+                    self.assertGreater(os.path.getsize(path), min_size, path)
 
                 with open(paths["json"], "r") as f:
                     data = json.load(f)
@@ -148,13 +97,17 @@ class V05ExportTests(unittest.TestCase):
                 self.assertEqual(data["transport"]["bpm"], config["bpm"])
                 self.assertEqual(data["musical_context"]["groove"], config["groove"])
                 self.assertEqual(len(data["tracks"]), 5)
-                self.assertEqual(len(data["parts"]), 4)
-                self.assertGreaterEqual(len(data["assets"]["audio"]), 4)
-                self.assertGreaterEqual(len(data["assets"]["midi"]), 4)
-                self.assertEqual(len(data["memory"]["generation_history"]), 4)
+                self.assertGreaterEqual(len(data["parts"]), 8)
+                self.assertEqual(len(data["assets"]["audio"]), 1)
+                self.assertEqual(data["assets"]["audio"][0]["scope"], "master")
+                self.assertGreaterEqual(len(data["assets"]["midi"]), 5)
+                self.assertEqual(len(data["memory"]["generation_history"]), len(data["parts"]))
 
                 with open(paths["midi"], "rb") as f:
                     self.assertEqual(f.read(4), b"MThd")
+                for track_id in ("drums", "bass", "chords", "lead"):
+                    with open(paths[f"midi_{track_id}"], "rb") as f:
+                        self.assertEqual(f.read(4), b"MThd")
 
                 with wave.open(paths["wav"], "rb") as wav:
                     self.assertEqual(wav.getnchannels(), 2)
