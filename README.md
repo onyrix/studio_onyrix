@@ -1,6 +1,6 @@
-# Studio Onyrix v0.5
+# Studio Onyrix v0.6
 
-Studio Onyrix is becoming a parametric AI DAW project engine. The current v0.5 focus is not a polished UI yet: it is the project format and export pipeline that a future DAW interface can sit on top of.
+Studio Onyrix is becoming a parametric AI DAW project engine. The current v0.6 focus is the project format, MIDI stem export, offline previews, and MusicGen integration that a future DAW interface can sit on top of.
 
 The engine can create a full song project with separated tracks, a source-of-truth JSON document, a master MIDI file, per-track MIDI files, and a WAV preview.
 
@@ -28,6 +28,12 @@ Generate a complete parametric song:
 
 ```powershell
 python main.py compose --style trap --name TrapNoir --output output/songs/trap_noir
+```
+
+Generate the same project with a MusicGen master WAV:
+
+```powershell
+python main.py compose --style synthwave --name NeonAI --render musicgen --model large --duration 30 --output output/songs/neon_ai
 ```
 
 Outputs:
@@ -72,6 +78,9 @@ Supported flags:
 - `--chords`: override chord progression
 - `--measures`: scale the arrangement to a target bar count
 - `--output`: export directory
+- `--render`: `offline` or `musicgen`
+- `--model`: MusicGen model, default `large`
+- `--duration`: MusicGen render duration in seconds
 
 ## Manual Project Commands
 
@@ -86,7 +95,7 @@ python main.py list
 python main.py json output/my_track.json
 ```
 
-## Project JSON v0.5
+## Project JSON v0.6
 
 The exported JSON has these top-level sections:
 
@@ -109,7 +118,7 @@ Important asset scopes:
 
 ## MIDI and WAV Export
 
-`v05_renderer.py` provides an offline deterministic renderer. It is intentionally simple:
+`v06_renderer.py` provides an offline deterministic renderer. It is intentionally simple:
 
 - It does not require MusicGen.
 - It writes a standard `.mid` master file.
@@ -118,12 +127,36 @@ Important asset scopes:
 
 The WAV preview is not the final sound design layer. It is a reliable transport/export check while the MIDI generation and instrument mapping are improved.
 
-## Tests
+## MusicGen
 
-Run the current v0.5 export test:
+v0.6 adds a MusicGen integration path. The default high-quality target is `facebook/musicgen-large`.
+
+Install dependencies:
 
 ```powershell
-python -m unittest test_v05_exports.py
+pip install -r requirements.txt
+```
+
+Run the optional MusicGen integration test:
+
+```powershell
+$env:ONYRIX_RUN_MUSICGEN_TESTS="1"
+$env:ONYRIX_MUSICGEN_MODEL="large"
+python -m unittest test_musicgen_integration.py
+```
+
+The `large` model is the preferred quality target, but it is heavy. Use `small` only for quick smoke tests on weaker machines:
+
+```powershell
+$env:ONYRIX_MUSICGEN_MODEL="small"
+```
+
+## Tests
+
+Run the current v0.6 export test:
+
+```powershell
+python -m unittest test_v06_exports.py
 ```
 
 The test creates four songs:
@@ -144,11 +177,13 @@ Each test song must export:
 
 ```text
 main.py              CLI entry point
+core:
 daw_engine.py        Core project, track, part, memory, mixer and MusicGen integration
-v05_song_factory.py  Parametric full-song factory and style presets
-v05_renderer.py      Offline MIDI/WAV exporter
+v06_song_factory.py  Parametric full-song factory and style presets
+v06_renderer.py      Offline MIDI/WAV exporter
 modern_ai_generator.py Optional MusicGen backend
-test_v05_exports.py  Export pipeline tests
+test_v06_exports.py  Export pipeline tests
+test_musicgen_integration.py Optional MusicGen integration test
 docs/                Install/run notes
 output/              Generated projects and assets
 ```

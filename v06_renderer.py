@@ -1,7 +1,7 @@
 """
-Offline v0.5 song renderer.
+Offline v0.6 song renderer.
 
-This module creates deterministic MIDI and WAV previews from the v0.5 project
+This module creates deterministic MIDI and WAV previews from the v0.6 project
 document. It is intentionally small and dependency-light: the goal is to test
 project structure, instrument routing and asset export without requiring
 MusicGen or external MIDI libraries.
@@ -62,7 +62,7 @@ class OfflineSongRenderer:
             part.analysis["midi_master_path"] = midi_master_path
             if part.track_id in midi_track_paths:
                 part.analysis["midi_track_path"] = midi_track_paths[part.track_id]
-            part.analysis["offline_renderer"] = "v0.5"
+            part.analysis["offline_renderer"] = "v0.6"
             if not part.duration:
                 part.duration = part.duration_seconds
             project.record_generation(

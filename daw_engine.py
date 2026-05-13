@@ -516,7 +516,7 @@ class DAWProject:
     - Project file save/load
     """
     name: str = "Untitled"
-    schema_version: str = "0.5"
+    schema_version: str = "0.6"
     bpm: int = 120
     division: str = "4/4"
     root: str = "C"
@@ -787,7 +787,7 @@ class DAWProject:
 
     def to_project_document(self) -> Dict[str, Any]:
         """
-        Export the v0.5 source-of-truth document for the future DAW UI.
+        Export the v0.6 source-of-truth document for the future DAW UI.
 
         This is intentionally more explicit than the dataclasses: UI code should
         be able to reconstruct transport, musical intent, timeline and assets

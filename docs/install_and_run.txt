@@ -1,4 +1,4 @@
-Studio Onyrix v0.5
+Studio Onyrix v0.6
 
 Install:
   pip install -r requirements.txt
@@ -6,8 +6,16 @@ Install:
 Run a full parametric song export:
   python main.py compose --style trap --name TrapNoir --output output/songs/trap_noir
 
+Run a MusicGen master render:
+  python main.py compose --style synthwave --render musicgen --model large --duration 30 --output output/songs/synthwave_ai
+
 Run tests:
-  python -m unittest test_v05_exports.py
+  python -m unittest test_v06_exports.py
+
+Run MusicGen integration test:
+  set ONYRIX_RUN_MUSICGEN_TESTS=1
+  set ONYRIX_MUSICGEN_MODEL=large
+  python -m unittest test_musicgen_integration.py
 
 Open outputs:
   output/songs/<style>/project.json

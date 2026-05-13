@@ -1,5 +1,5 @@
 """
-Parametric song factory for Studio Onyrix v0.5.
+Parametric song factory for Studio Onyrix v0.6.
 
 The factory turns a genre/style name into a full DAWProject: global musical
 settings, arrangement sections, tracks and generated parts. It is the bridge
@@ -127,7 +127,7 @@ def create_song_project(
         groove=preset["groove"],
         swing=preset["swing"],
         style_tags=preset["style_tags"],
-        description=f"Parametric Studio Onyrix v0.5 {style} project",
+        description=f"Parametric Studio Onyrix v0.6 {style} project",
     )
     project.memory["intent"] = (
         f"Generate a complete {style} track as a DAW project with separated "

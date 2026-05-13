@@ -7,18 +7,19 @@ audio directly from text descriptions, with zero cloud costs.
 """
 
 import numpy as np
-import torch
 import os
 from typing import Optional, Dict, List
 
 # Check available modern AI libraries
 try:
+    import torch
     from transformers import AutoProcessor, MusicgenForConditionalGeneration
     MUSICGEN_AVAILABLE = True
 except ImportError:
+    torch = None
     MUSICGEN_AVAILABLE = False
-    print("Warning: MusicGen (transformers) not available.")
-    print("Install: pip install transformers torchaudio")
+    print("Warning: MusicGen dependencies not available.")
+    print("Install: pip install torch torchaudio transformers")
 
 try:
     import librosa
@@ -57,6 +58,7 @@ class MusicGenGenerator:
         self.model = None
         self.processor = None
         self.available = False
+        self.sample_rate = 32000
         
         if MUSICGEN_AVAILABLE:
             try:
@@ -66,14 +68,16 @@ class MusicGenGenerator:
                 self.processor = AutoProcessor.from_pretrained(model_name)
                 self.model = MusicgenForConditionalGeneration.from_pretrained(model_name)
                 self.model.to(self.device)
+                self.sample_rate = getattr(self.model.config.audio_encoder, "sampling_rate", 32000)
                 
                 self.available = True
                 print(f"MusicGen-{model_size} loaded successfully.")
                 print(f"  Device: {self.device}")
+                print(f"  Sample rate: {self.sample_rate} Hz")
                 print(f"  Max duration: {30 if model_size == 'small' else 95} seconds")
             except Exception as e:
                 print(f"Failed to load MusicGen: {e}")
-                print("  Try: pip install transformers torchaudio")
+                print("  Try: pip install torch torchaudio transformers")
                 print("  Or use model_size='small' for lower memory")
         else:
             print("MusicGen not available. Install: pip install transformers")

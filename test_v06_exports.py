@@ -3,11 +3,11 @@ import os
 import unittest
 import wave
 
-from v05_renderer import OfflineSongRenderer
-from v05_song_factory import create_song_project
+from v06_renderer import OfflineSongRenderer
+from v06_song_factory import create_song_project
 
 
-OUTPUT_ROOT = os.path.join("output", "v05_test_songs")
+OUTPUT_ROOT = os.path.join("output", "v06_test_songs")
 
 
 SONG_FIXTURES = [
@@ -76,7 +76,7 @@ def build_project(config):
     )
 
 
-class V05ExportTests(unittest.TestCase):
+class V06ExportTests(unittest.TestCase):
     def test_four_genre_projects_export_json_midi_wav(self):
         renderer = OfflineSongRenderer(sample_rate=32000)
 
@@ -93,7 +93,7 @@ class V05ExportTests(unittest.TestCase):
 
                 with open(paths["json"], "r") as f:
                     data = json.load(f)
-                self.assertEqual(data["schema_version"], "0.5")
+                self.assertEqual(data["schema_version"], "0.6")
                 self.assertEqual(data["transport"]["bpm"], config["bpm"])
                 self.assertEqual(data["musical_context"]["groove"], config["groove"])
                 self.assertEqual(len(data["tracks"]), 5)
