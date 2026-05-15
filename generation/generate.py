@@ -4,6 +4,8 @@ from transformers import GPT2Config, GPT2LMHeadModel
 from miditok import REMI, TokenizerConfig
 from miditoolkit import MidiFile
 
+from ai.styles import encode_style
+
 MODEL_PATH = "moonbeam_style_model.pt"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -25,7 +27,7 @@ tokenizer = REMI(config)
 # MODEL
 # ----------------------------
 model_config = GPT2Config(
-    vocab_size=5000,
+    vocab_size=12000,
     n_embd=256,
     n_layer=6,
     n_head=8
@@ -85,20 +87,39 @@ def save_midi(tokens, out_path):
 # ----------------------------
 # MAIN
 # ----------------------------
+from ai.chords import encode_chords
+
+
 def main():
 
     seed = load_seed_tokens("input.mid")
 
     print("🎹 Seed loaded")
 
-    generated = generate(seed)
+    # ----------------------------
+    # CHORD CONDITIONING
+    # ----------------------------
+    chords = [
+        "Cmaj7",
+        "Am",
+        "F",
+        "G"
+    ]
+
+    chord_tokens = encode_chords(chords)
+
+    conditioned_input = chord_tokens + seed
+
+    print("🎼 Chord conditioning applied")
+
+    style_tokens = encode_style("LOFI")
+
+    conditioned_input = style_tokens + conditioned_input
+
+    generated = generate(conditioned_input)
 
     print("🧠 Generation complete")
 
-    save_midi(generated, "output/generated_ai.mid")
+    save_midi(generated, "output/generated_chord.mid")
 
-    print("✔ Saved output/generated_ai.mid")
-
-
-if __name__ == "__main__":
-    main()
+    print("✔ Saved output/generated_chord.mid")

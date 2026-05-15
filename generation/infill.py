@@ -27,7 +27,7 @@ tokenizer = REMI(config)
 # MODEL
 # ----------------------------
 model_config = GPT2Config(
-    vocab_size=5000,
+    vocab_size=12000,
     n_embd=256,
     n_layer=6,
     n_head=8

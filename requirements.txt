@@ -20,3 +20,5 @@ datasets
 tokenizers
 accelerate
 safetensors
+
+music21

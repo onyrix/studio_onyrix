@@ -5,6 +5,10 @@ from pathlib import Path
 from miditok import REMI, TokenizerConfig
 from miditoolkit import MidiFile
 
+from ai.harmony import extract_chord_timeline
+from ai.chords import encode_timeline_chords
+from ai.styles import encode_style
+
 RAW_DATASET = "dataset/raw/maestro"
 TOKENS_DIR = "dataset/processed/tokens"
 
@@ -40,19 +44,38 @@ def get_midi_files(root):
 # ----------------------------
 # ENCODE MIDI
 # ----------------------------
-def encode_midi(midi_path):
+def encode_midi(midi_path, style="JAZZ"):
+
     try:
         midi = MidiFile(midi_path)
 
-        tokens = tokenizer(midi)
+        midi_tokens = tokenizer(midi).ids
 
-        return tokens.ids
+        # ----------------------------
+        # STYLE TOKENS
+        # ----------------------------
+        style_tokens = encode_style(style)
+
+        # ----------------------------
+        # TIMELINE CHORDS
+        # ----------------------------
+        timeline = extract_chord_timeline(midi_path)
+
+        chord_tokens = encode_timeline_chords(timeline)
+
+        final_tokens = (
+            style_tokens
+            + chord_tokens
+            + midi_tokens
+        )
+
+        return final_tokens
 
     except Exception as e:
         print(f"❌ Failed: {midi_path}")
         print(e)
-        return None
 
+        return None
 
 # ----------------------------
 # SAVE TOKENS
