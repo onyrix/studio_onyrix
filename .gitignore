@@ -1,5 +1,11 @@
 # folder project temp
 output/
+old/
+dataset/raw/
+dataset/index/
+dataset/processed/
+
+*.mid
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
