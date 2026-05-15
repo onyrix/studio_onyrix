@@ -46,7 +46,7 @@ from daw_engine import (
 )
 from v06_renderer import OfflineSongRenderer
 from v06_song_factory import available_styles, create_song_project
-from v06_musicgen_renderer import MusicGenSongRenderer
+from v06_midi_renderer import MidiSongRenderer
 
 
 # ============================================================
@@ -422,8 +422,8 @@ def cmd_compose_song(args):
 
     output_dir = kwargs.get('output', os.path.join("output", "songs", style))
     render_mode = kwargs.get('render', 'offline')
-    if render_mode in ('musicgen', 'ai'):
-        renderer = MusicGenSongRenderer(
+    if render_mode in ('midi', 'ai'):
+        renderer = MidiSongRenderer(
             model_size=kwargs.get('model', 'large'),
             device=kwargs.get('device'),
         )
@@ -713,9 +713,9 @@ PROJECT:
       --chords "Am F C G"        Override chord progression
       --measures <24>            Scale arrangement to total bars
       --output <folder>          Export folder
-      --render <offline|musicgen> Use offline preview or MusicGen master WAV
-      --model <large>            MusicGen model: small, medium, large
-      --duration <30>            MusicGen render duration in seconds
+      --render <offline|midi> Use offline preview or MIDI master WAV
+      --model <large>            MIDI model: small, medium, large
+      --duration <30>            MIDI render duration in seconds
   load <file>                    Load project from file
   save [file]                    Save project to file
   json [file]                    Export v0.6 project JSON
