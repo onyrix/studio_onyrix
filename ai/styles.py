@@ -1,19 +1,14 @@
 from ai.config import STYLE_TOKEN_START
+from generation.music_config import STYLE_LIBRARY
 
 
 STYLE_TOKENS = {
-    "CLASSICAL": STYLE_TOKEN_START,
-    "JAZZ": STYLE_TOKEN_START + 1,
-    "LOFI": STYLE_TOKEN_START + 2,
-    "TECHNO": STYLE_TOKEN_START + 3,
-    "CINEMATIC": STYLE_TOKEN_START + 4,
-    "AMBIENT": STYLE_TOKEN_START + 5,
-    "EDM": STYLE_TOKEN_START + 6
+    style.upper(): STYLE_TOKEN_START + index
+    for index, style in enumerate(sorted(STYLE_LIBRARY))
 }
 
 
 def encode_style(style):
-
     style = style.upper()
 
     if style in STYLE_TOKENS:

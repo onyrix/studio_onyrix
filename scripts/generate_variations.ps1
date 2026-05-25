@@ -1,8 +1,6 @@
 param(
-    [string]$InputMidi = "input.mid",
-    [string]$OutputDir = "output/generated_variations",
-    [int]$MaxNewTokens = 128,
-    [string]$Checkpoint = "moonbeam_style_model.pt",
+    [string]$OutputDir = "output/generated_songs",
+    [int]$Bars = 32,
     [string]$Python = ""
 )
 
@@ -21,13 +19,11 @@ if (-not $Python) {
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 & $Python -m generation.batch `
-    --input $InputMidi `
     --output-dir $OutputDir `
-    --max-new-tokens $MaxNewTokens `
-    --checkpoint $Checkpoint
+    --bars $Bars
 
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Host "Generated MIDI variations in $OutputDir"
+Write-Host "Generated MIDI songs in $OutputDir"

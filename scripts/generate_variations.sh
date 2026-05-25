@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INPUT_MIDI="${1:-input.mid}"
-OUTPUT_DIR="${2:-output/generated_variations}"
-MAX_NEW_TOKENS="${3:-128}"
-CHECKPOINT="${4:-moonbeam_style_model.pt}"
+OUTPUT_DIR="${1:-output/generated_songs}"
+BARS="${2:-32}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -20,9 +18,7 @@ fi
 mkdir -p "$OUTPUT_DIR"
 
 "$PYTHON" -m generation.batch \
-    --input "$INPUT_MIDI" \
     --output-dir "$OUTPUT_DIR" \
-    --max-new-tokens "$MAX_NEW_TOKENS" \
-    --checkpoint "$CHECKPOINT"
+    --bars "$BARS"
 
-echo "Generated MIDI variations in $OUTPUT_DIR"
+echo "Generated MIDI songs in $OUTPUT_DIR"

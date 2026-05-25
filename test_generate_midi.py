@@ -1,27 +1,42 @@
 import os
 import unittest
 
-from ai.pipeline import MidiAIPipeline
-from ai.tokenizer import MidiTokenizer
+from miditoolkit import MidiFile
 
-
-class EchoModel:
-    def generate(self, input_ids, max_len=512):
-        return input_ids
+from generation.composer import generate_song
+from generation.music_config import INSTRUMENT_LIBRARY, MOOD_LIBRARY, STYLE_LIBRARY
+from generation.song_config import SongConfig
 
 
 class GenerateMidiTests(unittest.TestCase):
-    def test_pipeline_generates_decodable_midi(self):
-        pipeline = MidiAIPipeline.__new__(MidiAIPipeline)
-        pipeline.tokenizer = MidiTokenizer()
-        pipeline.model = EchoModel()
+    def test_music_configuration_is_available(self):
+        self.assertIn("synthwave", STYLE_LIBRARY)
+        self.assertIn("peaceful", MOOD_LIBRARY)
+        self.assertIn("bell", INSTRUMENT_LIBRARY)
+        self.assertIn("tracks", STYLE_LIBRARY["lofi"])
 
-        out_path = "output/test_generated.mid"
-        result = pipeline.generate_from_midi("input.mid", out_path=out_path)
+    def test_full_song_generator_creates_multitrack_midi(self):
+        out_path = "output/test_full_song.mid"
+        result = generate_song(
+            SongConfig(
+                title="Unit Test Groove",
+                bpm=96,
+                mood="dreamy",
+                style="lofi",
+                chords=["Cmaj7", "Am7", "Fmaj7", "G"],
+                bars=8,
+                prompt="human cool laidback keys",
+                output=out_path,
+            )
+        )
+
+        midi = MidiFile(result)
 
         self.assertEqual(result, out_path)
         self.assertTrue(os.path.exists(out_path))
-        self.assertGreater(os.path.getsize(out_path), 0)
+        self.assertGreaterEqual(len(midi.instruments), 4)
+        self.assertTrue(any(instrument.is_drum for instrument in midi.instruments))
+        self.assertGreater(sum(len(instrument.notes) for instrument in midi.instruments), 40)
 
 
 if __name__ == "__main__":

@@ -3,32 +3,56 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from ai.pipeline import MidiAIPipeline
+from generation.composer import generate_song
+from generation.music_config import INSTRUMENT_LIBRARY, MOOD_LIBRARY, STYLE_LIBRARY
+from generation.song_config import SongConfig
 
 router = APIRouter()
 
 
+@router.get("/config")
+def config():
+    return {
+        "styles": STYLE_LIBRARY,
+        "moods": MOOD_LIBRARY,
+        "instruments": INSTRUMENT_LIBRARY,
+    }
+
+
 class GenerateRequest(BaseModel):
-    midi_path: str = "input.mid"
-    output_path: str = "output/generated.mid"
-    style: Optional[str] = None
-    chords: Optional[list[str]] = None
-    max_new_tokens: int = Field(default=512, ge=1, le=2048)
+    title: str = "Onyrix Song"
+    bpm: Optional[int] = Field(default=None, ge=40, le=220)
+    mood: str = "dreamy"
+    style: str = "lofi"
+    chords: list[str] = Field(default_factory=lambda: ["Cmaj7", "Am", "F", "G"])
+    tracks: list[str] = Field(default_factory=list)
+    bars: int = Field(default=32, ge=4, le=128)
+    prompt: str = ""
+    output: str = "output/generated_song.mid"
 
 
 @router.post("/generate")
 def generate(data: GenerateRequest):
     try:
-        pipeline = MidiAIPipeline()
-        out_path = pipeline.generate_from_midi(
-            data.midi_path,
-            out_path=data.output_path,
-            style=data.style,
-            chords=data.chords,
-            max_new_tokens=data.max_new_tokens,
+        if data.style.lower() not in STYLE_LIBRARY:
+            styles = ", ".join(sorted(STYLE_LIBRARY))
+            raise ValueError(f"Unknown style '{data.style}'. Available styles: {styles}")
+
+        out_path = generate_song(
+            SongConfig(
+                title=data.title,
+                bpm=data.bpm,
+                mood=data.mood,
+                style=data.style,
+                chords=data.chords,
+                tracks=data.tracks,
+                bars=data.bars,
+                prompt=data.prompt,
+                output=data.output,
+            )
         )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

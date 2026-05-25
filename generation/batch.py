@@ -1,69 +1,97 @@
 import argparse
 from pathlib import Path
 
-from ai.config import DEFAULT_MODEL_PATH
-from ai.pipeline import GenerationJob, MidiAIPipeline
+from generation.composer import generate_song
+from generation.song_config import SongConfig
 
 
 PRESETS = [
     {
-        "name": "lofi_calm",
-        "style": "LOFI",
-        "chords": ["Cmaj7", "Am", "F", "G"],
+        "title": "Neon Rain",
+        "style": "lofi",
+        "mood": "dreamy",
+        "bpm": 78,
+        "chords": ["Cmaj7", "Am7", "Fmaj7", "G"],
+        "prompt": "warm vinyl keys, late night rain, human loose timing",
     },
     {
-        "name": "jazz_minor",
-        "style": "JAZZ",
+        "title": "Blue Room Session",
+        "style": "jazz",
+        "mood": "romantic",
+        "bpm": 116,
         "chords": ["Dm7", "G7", "Cmaj7", "Am7"],
+        "prompt": "small club quartet, elegant lead, brushed groove",
     },
     {
-        "name": "cinematic_dark",
-        "style": "CINEMATIC",
+        "title": "Ashes Over Orion",
+        "style": "cinematic",
+        "mood": "epic",
+        "bpm": 92,
         "chords": ["Am", "F", "C", "G"],
+        "prompt": "wide strings, heroic piano, dark trailer pulse",
     },
     {
-        "name": "ambient_open",
-        "style": "AMBIENT",
+        "title": "Glass Garden",
+        "style": "ambient",
+        "mood": "dreamy",
+        "bpm": 68,
         "chords": ["Fmaj7", "Cmaj7", "G", "Am"],
+        "prompt": "floating pads, sparse piano, soft evolving melody",
     },
     {
-        "name": "edm_bright",
-        "style": "EDM",
+        "title": "Voltage Smile",
+        "style": "edm",
+        "mood": "energetic",
+        "bpm": 128,
         "chords": ["C", "G", "Am", "F"],
+        "prompt": "festival plucks, bright hook, four on the floor",
+    },
+    {
+        "title": "Chrome Avenue",
+        "style": "synthwave",
+        "mood": "dark",
+        "bpm": 100,
+        "chords": ["Am", "F", "Dm", "E"],
+        "prompt": "retro night drive, analog bass, melancholic neon lead",
     },
 ]
 
 
-def build_jobs(input_path, output_dir, max_new_tokens):
-    output_dir = Path(output_dir)
+def slugify(value):
+    chars = []
+    for char in value.lower():
+        if char.isalnum():
+            chars.append(char)
+        elif chars and chars[-1] != "_":
+            chars.append("_")
 
-    for preset in PRESETS:
-        yield GenerationJob(
-            midi_path=input_path,
-            out_path=str(output_dir / f"{preset['name']}.mid"),
-            style=preset["style"],
-            chords=preset["chords"],
-            max_new_tokens=max_new_tokens,
-        )
+    return "".join(chars).strip("_") or "song"
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Generate several MIDI variations.")
-    parser.add_argument("--input", default="input.mid", help="Seed MIDI file.")
-    parser.add_argument("--output-dir", default="output/generated_variations")
-    parser.add_argument("--max-new-tokens", type=int, default=128)
-    parser.add_argument("--checkpoint", default=DEFAULT_MODEL_PATH)
+    parser = argparse.ArgumentParser(description="Generate several full MIDI songs.")
+    parser.add_argument("--output-dir", default="output/generated_songs")
+    parser.add_argument("--bars", type=int, default=32)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    pipeline = MidiAIPipeline(checkpoint_path=args.checkpoint)
-
-    for job in build_jobs(args.input, args.output_dir, args.max_new_tokens):
-        out_path = pipeline.generate_job(job)
+    for preset in PRESETS:
+        config = SongConfig(
+            title=preset["title"],
+            bpm=preset["bpm"],
+            mood=preset["mood"],
+            style=preset["style"],
+            chords=preset["chords"],
+            bars=args.bars,
+            prompt=preset["prompt"],
+            output=str(output_dir / f"{slugify(preset['title'])}.mid"),
+        )
+        out_path = generate_song(config)
         print(f"Saved {out_path}")
 
 
