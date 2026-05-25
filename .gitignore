@@ -1,9 +1,7 @@
 # folder project temp
 output/
 old/
-dataset/raw/
-dataset/index/
-dataset/processed/
+dataset/
 
 *.mid
 

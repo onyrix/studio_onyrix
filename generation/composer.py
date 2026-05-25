@@ -208,18 +208,37 @@ class SongComposer:
             if groove in ("four_on_floor", "retro", "rock", "funk"):
                 for beat in range(4):
                     self._drum_note(instrument, DRUM_NOTES["kick"], base + beat * TICKS_PER_BEAT, 92 + gain)
+            elif groove == "breakbeat":
+                for offset in (0, STEP_TICKS * 3, TICKS_PER_BEAT * 3):
+                    self._drum_note(instrument, DRUM_NOTES["kick"], base + offset, 88 + gain)
+            elif groove == "dembow":
+                for offset in (0, STEP_TICKS * 3, TICKS_PER_BEAT * 2, STEP_TICKS * 7):
+                    self._drum_note(instrument, DRUM_NOTES["kick"], base + offset, 88 + gain)
+            elif groove == "latin":
+                for offset in (0, STEP_TICKS * 2, STEP_TICKS * 5):
+                    self._drum_note(instrument, DRUM_NOTES["kick"], base + offset, 84 + gain)
             else:
                 self._drum_note(instrument, DRUM_NOTES["kick"], base + TICKS_PER_BEAT * 2, 84 + gain)
 
-            for beat in (1, 3):
-                snare = DRUM_NOTES["clap"] if groove in ("edm", "four_on_floor") else DRUM_NOTES["snare"]
-                self._drum_note(instrument, snare, base + beat * TICKS_PER_BEAT, 86 + gain)
+            if groove == "breakbeat":
+                snare_offsets = (TICKS_PER_BEAT, STEP_TICKS * 5)
+            elif groove == "dembow":
+                snare_offsets = (STEP_TICKS * 2, STEP_TICKS * 6)
+            else:
+                snare_offsets = (TICKS_PER_BEAT, TICKS_PER_BEAT * 3)
+
+            for offset in snare_offsets:
+                snare = DRUM_NOTES["clap"] if groove in ("dembow", "four_on_floor") else DRUM_NOTES["snare"]
+                self._drum_note(instrument, snare, base + offset, 86 + gain)
 
             hat_steps = range(0, 8) if self._section_density(bar) > 0.55 else range(0, 8, 2)
             for step in hat_steps:
                 if groove == "trap" and step in (1, 5) and self.rng.random() < 0.7:
                     self._drum_note(instrument, DRUM_NOTES["closed_hat"], base + step * STEP_TICKS + STEP_TICKS // 2, 55 + gain)
                 self._drum_note(instrument, DRUM_NOTES["closed_hat"], base + self._swing(step * STEP_TICKS), 50 + gain)
+
+            if groove in ("latin", "dembow") and bar % 2 == 0:
+                self._drum_note(instrument, DRUM_NOTES["open_hat"], base + STEP_TICKS * 7, 62 + gain)
 
     def _write_taiko(self, instrument):
         for bar in range(self.config.bars):

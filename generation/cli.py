@@ -2,6 +2,7 @@ import argparse
 
 from generation.composer import generate_song
 from generation.music_config import INSTRUMENT_LIBRARY, MOOD_LIBRARY, STYLE_LIBRARY
+from generation.project import PROJECT_NAME, PROJECT_VERSION
 from generation.song_config import SongConfig
 
 
@@ -18,6 +19,7 @@ def parse_list(value):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate a full multi-track MIDI song.")
+    parser.add_argument("--version", action="version", version=f"{PROJECT_NAME} {PROJECT_VERSION}")
     parser.add_argument("--title", default="Onyrix Song")
     parser.add_argument("--bpm", type=int, default=None)
     parser.add_argument("--mood", default="dreamy")

@@ -1,24 +1,5 @@
-torch
-transformers
-miditok
 miditoolkit
-pretty_midi
 
 fastapi
 uvicorn
 pydantic
-
-numpy
-scipy
-
-python-rtmidi
-
-tqdm
-
-datasets
-
-tokenizers
-accelerate
-safetensors
-
-music21

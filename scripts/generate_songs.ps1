@@ -1,6 +1,11 @@
 param(
     [string]$OutputDir = "output/generated_songs",
     [int]$Bars = 32,
+    [string]$Mode = "presets",
+    [string[]]$Styles = @(),
+    [string[]]$Moods = @(),
+    [int]$Limit = 0,
+    [string]$PromptSuffix = "",
     [string]$Python = ""
 )
 
@@ -18,9 +23,17 @@ if (-not $Python) {
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
+$StyleArg = ($Styles -join ",")
+$MoodArg = ($Moods -join ",")
+
 & $Python -m generation.batch `
     --output-dir $OutputDir `
-    --bars $Bars
+    --bars $Bars `
+    --mode $Mode `
+    --styles $StyleArg `
+    --moods $MoodArg `
+    --limit $Limit `
+    --prompt-suffix $PromptSuffix
 
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE

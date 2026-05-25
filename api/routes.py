@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from generation.composer import generate_song
 from generation.music_config import INSTRUMENT_LIBRARY, MOOD_LIBRARY, STYLE_LIBRARY
+from generation.project import PROJECT_NAME, PROJECT_VERSION
 from generation.song_config import SongConfig
 
 router = APIRouter()
@@ -13,6 +14,8 @@ router = APIRouter()
 @router.get("/config")
 def config():
     return {
+        "project": PROJECT_NAME,
+        "version": PROJECT_VERSION,
         "styles": STYLE_LIBRARY,
         "moods": MOOD_LIBRARY,
         "instruments": INSTRUMENT_LIBRARY,
