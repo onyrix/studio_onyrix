@@ -1,8 +1,22 @@
-from ai.harmony import extract_chords
+import unittest
 
-chords = extract_chords("input.mid")
+from ai.harmony import extract_chord_timeline, extract_chords
 
-print("\n🎹 Extracted chords:\n")
 
-for c in chords:
-    print(c)
+class HarmonyTests(unittest.TestCase):
+    def test_extract_chords_returns_list(self):
+        chords = extract_chords("input.mid")
+
+        self.assertIsInstance(chords, list)
+
+    def test_extract_chord_timeline_returns_timed_items(self):
+        timeline = extract_chord_timeline("input.mid")
+
+        self.assertIsInstance(timeline, list)
+        for item in timeline:
+            self.assertIn("time", item)
+            self.assertIn("chord", item)
+
+
+if __name__ == "__main__":
+    unittest.main()

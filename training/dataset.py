@@ -10,15 +10,16 @@ TOKENS_DIR = "dataset/processed/tokens"
 
 class MidiTokenDataset(Dataset):
 
-    def __init__(self, seq_len=512):
+    def __init__(self, seq_len=512, tokens_dir=TOKENS_DIR):
         self.seq_len = seq_len
+        self.tokens_dir = tokens_dir
 
         self.samples = []
 
-        files = os.listdir(TOKENS_DIR)
+        files = os.listdir(self.tokens_dir)
 
         for f in files:
-            path = os.path.join(TOKENS_DIR, f)
+            path = os.path.join(self.tokens_dir, f)
 
             with open(path, "r") as fp:
                 tokens = json.load(fp)
@@ -30,7 +31,7 @@ class MidiTokenDataset(Dataset):
 
                 self.samples.append((x, y))
 
-        print(f"🎹 Dataset samples: {len(self.samples)}")
+        print(f"Dataset samples: {len(self.samples)}")
 
 
     def __len__(self):

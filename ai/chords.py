@@ -1,6 +1,9 @@
+from ai.config import CHORD_TOKEN_START, TIME_OFFSET_TOKEN_START
+
+
 CHORD_VOCAB = {}
 
-START_TOKEN = 5000
+START_TOKEN = CHORD_TOKEN_START
 
 
 def build_chord_vocab():
@@ -46,7 +49,7 @@ def encode_chords(chords):
 
     return tokens
 
-TIME_OFFSET_BASE = 6000
+TIME_OFFSET_BASE = TIME_OFFSET_TOKEN_START
 
 
 def encode_timeline_chords(timeline):

@@ -52,7 +52,19 @@ def extract_chord_timeline(midi_path):
         return cleaned
 
     except Exception as e:
-        print(f"❌ Harmony extraction failed: {midi_path}")
+        print(f"Harmony extraction failed: {midi_path}")
         print(e)
 
         return []
+
+
+def extract_chords(midi_path):
+    timeline = extract_chord_timeline(midi_path)
+    chords = []
+
+    for item in timeline:
+        chord_name = item["chord"]
+        if chord_name not in chords:
+            chords.append(chord_name)
+
+    return chords

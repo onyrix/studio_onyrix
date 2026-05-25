@@ -1,20 +1,28 @@
 import os
+import unittest
+
 from ai.pipeline import MidiAIPipeline
+from ai.tokenizer import MidiTokenizer
 
-OUTPUT_DIR = "output"
 
-def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+class EchoModel:
+    def generate(self, input_ids, max_len=512):
+        return input_ids
 
-    pipeline = MidiAIPipeline()
 
-    input_midi = "input.mid"  # metti un file MIDI reale qui
+class GenerateMidiTests(unittest.TestCase):
+    def test_pipeline_generates_decodable_midi(self):
+        pipeline = MidiAIPipeline.__new__(MidiAIPipeline)
+        pipeline.tokenizer = MidiTokenizer()
+        pipeline.model = EchoModel()
 
-    print("🚀 Running AI MIDI generation...")
+        out_path = "output/test_generated.mid"
+        result = pipeline.generate_from_midi("input.mid", out_path=out_path)
 
-    out = pipeline.generate_from_midi(input_midi)
+        self.assertEqual(result, out_path)
+        self.assertTrue(os.path.exists(out_path))
+        self.assertGreater(os.path.getsize(out_path), 0)
 
-    print(f"✔ Generated: {out}")
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

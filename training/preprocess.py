@@ -72,7 +72,7 @@ def encode_midi(midi_path, style="JAZZ"):
         return final_tokens
 
     except Exception as e:
-        print(f"❌ Failed: {midi_path}")
+        print(f"Failed: {midi_path}")
         print(e)
 
         return None
@@ -91,7 +91,7 @@ def save_tokens(tokens, out_path):
 def main():
     midi_files = get_midi_files(RAW_DATASET)
 
-    print(f"🎹 Found {len(midi_files)} MIDI files")
+    print(f"Found {len(midi_files)} MIDI files")
 
     for i, midi_path in enumerate(midi_files):
 
@@ -106,7 +106,7 @@ def main():
         save_tokens(tokens, out_path)
 
         if i % 10 == 0:
-            print(f"✔ Processed {i}/{len(midi_files)}")
+            print(f"Processed {i}/{len(midi_files)}")
 
 
 if __name__ == "__main__":

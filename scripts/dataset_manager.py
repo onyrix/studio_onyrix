@@ -15,7 +15,7 @@ class DatasetManager:
     # MAESTRO (OFFICIAL DOWNLOAD)
     # ----------------------------
     def download_maestro(self):
-        print("🎼 Downloading MAESTRO dataset...")
+        print("Downloading MAESTRO dataset...")
 
         url = "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip"
 
@@ -23,10 +23,10 @@ class DatasetManager:
 
         if not os.path.exists(out_path):
             urllib.request.urlretrieve(url, out_path)
-            print("✔ Downloaded MAESTRO")
+            print("Downloaded MAESTRO")
 
         else:
-            print("✔ MAESTRO already downloaded")
+            print("MAESTRO already downloaded")
 
         self._extract_zip(out_path, os.path.join(RAW_DIR, "maestro"))
 
@@ -34,8 +34,8 @@ class DatasetManager:
     # LAKH MIDI (MANUAL DOWNLOAD)
     # ----------------------------
     def download_lakh_info(self):
-        print("🎹 LAKH MIDI must be downloaded manually.")
-        print("👉 https://colinraffel.com/projects/lmd/")
+        print("LAKH MIDI must be downloaded manually.")
+        print("https://colinraffel.com/projects/lmd/")
         print("Place it into: dataset/raw/lakh/")
 
     # ----------------------------
@@ -43,15 +43,15 @@ class DatasetManager:
     # ----------------------------
     def _extract_zip(self, path, dest):
         if os.path.exists(dest):
-            print("✔ Already extracted")
+            print("Already extracted")
             return
 
-        print("📦 Extracting...")
+        print("Extracting...")
 
         with zipfile.ZipFile(path, 'r') as zip_ref:
             zip_ref.extractall(dest)
 
-        print("✔ Extracted")
+        print("Extracted")
 
 
 # ----------------------------
@@ -60,9 +60,9 @@ class DatasetManager:
 if __name__ == "__main__":
     manager = DatasetManager()
 
-    print("\n🚀 Stable dataset setup...\n")
+    print("\nStable dataset setup...\n")
 
     manager.download_maestro()
     manager.download_lakh_info()
 
-    print("\n✅ DONE")
+    print("\nDONE")
