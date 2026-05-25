@@ -33,7 +33,3 @@ def generate(data: GenerateRequest):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return {"status": "ok", "path": out_path}
-
-@router.post("/infill")
-def infill(data: dict):
-    return {"status": "not_implemented"}
