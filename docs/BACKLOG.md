@@ -82,7 +82,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 |---|---|---|
 | B-60 | `core/harmony`: `chord_symbol` (inverse of `parse_chord`), `diatonic_chords`, `roman_numeral`, `suggest_next` (functional, secondary dominant, modal borrowing, tritone sub, relative) | ✅ |
 | B-61 | `RuleBasedPlanner.suggest_progressions` per mode × genre × section kind, length variants, cadences | ✅ |
-| B-62 | `/harmony/diatonic`, `/harmony/suggest`, `/harmony/next` | ⬜ |
+| B-62 | `/harmony/diatonic`, `/harmony/suggest`, `/harmony/next` | ✅ |
 | B-63 | Chord lane in the timeline: per-section grid editing with server validation | ⬜ |
 | B-64 | Suggestion popovers: progression for the selected section, chord change on a bar | ⬜ |
 | B-70 | Spike: what do prism's 13 `pitch_class_set` levels encode? Use per bar if possible | ⬜ |

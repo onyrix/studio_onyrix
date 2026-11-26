@@ -84,10 +84,35 @@ _CADENCE: dict[str, dict[Mode, str]] = {
 }
 
 
+_KIND_ALIASES = {
+    "pre": "prechorus",
+    "prerit": "prechorus",
+    "preritornello": "prechorus",
+    "strofa": "verse",
+    "ritornello": "chorus",
+    "refrain": "chorus",
+    "hook": "chorus",
+    "ponte": "bridge",
+    "special": "bridge",
+    "finale": "outro",
+    "coda": "outro",
+    "ending": "outro",
+}
+
+
 def normalize_kind(kind: str) -> str:
-    kind = kind.strip().lower().replace("-", "").replace(" ", "")
-    aliases = {"pre": "prechorus", "strofa": "verse", "ritornello": "chorus", "ponte": "bridge"}
-    return aliases.get(kind, kind)
+    kind = "".join(ch for ch in kind.lower() if ch.isalpha())
+    return _KIND_ALIASES.get(kind, kind)
+
+
+def kind_from_name(name: str) -> str:
+    """Section kind guessed from a section name such as "Chorus 2" or "Strofa A"; "" if unknown."""
+    words = name.lower().replace("-", "").split()
+    for candidate in ("".join(words), *(words[:1])):
+        kind = normalize_kind(candidate)
+        if kind in SECTION_KINDS:
+            return kind
+    return ""
 
 
 class RuleBasedPlanner:

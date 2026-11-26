@@ -4,7 +4,13 @@ from hypothesis import strategies as st
 
 from app.core.harmony import chord_from_roman, chord_symbol, parse_chord
 from app.core.model import Key, Mode
-from app.gen.planner import SECTION_KINDS, TEMPLATES, RuleBasedPlanner, normalize_kind
+from app.gen.planner import (
+    SECTION_KINDS,
+    TEMPLATES,
+    RuleBasedPlanner,
+    kind_from_name,
+    normalize_kind,
+)
 
 planner = RuleBasedPlanner()
 
@@ -64,3 +70,10 @@ def test_kind_aliases() -> None:
     assert normalize_kind("Pre-Chorus") == "prechorus"
     assert normalize_kind("ritornello") == "chorus"
     assert normalize_kind("Strofa") == "verse"
+
+
+def test_kind_from_section_name() -> None:
+    assert kind_from_name("Chorus 2") == "chorus"
+    assert kind_from_name("Strofa A") == "verse"
+    assert kind_from_name("Pre-Chorus") == "prechorus"
+    assert kind_from_name("Drop") == ""
