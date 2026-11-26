@@ -30,6 +30,26 @@ def engine(request: pytest.FixtureRequest) -> MidiGptEngine:
     return MidiGptEngine(request.param, device="cpu")
 
 
+def test_raw_output_respects_pitch_mask(engine: MidiGptEngine) -> None:
+    """Regression: scale and role range must constrain the model itself (before post-processing)."""
+    spec = GenerationSpec(
+        bars=4,
+        target_role=Role.BASS,
+        target_spec=role_spec(Role.BASS),
+        target_program=33,
+        context=(CHORD_CONTEXT,),
+        key=Key(9, Mode.MINOR),
+        chords=CHORDS,
+        n_candidates=2,
+        seed=7,
+    )
+    scale = {0, 2, 4, 5, 7, 9, 11}
+    for candidate in engine.sample(spec):
+        assert candidate.notes
+        assert all(n.p % 12 in scale for n in candidate.notes)
+        assert all(28 <= n.p <= 55 for n in candidate.notes)
+
+
 @pytest.mark.parametrize("role", [Role.DRUMS, Role.BASS, Role.CHORDS, Role.PAD, Role.LEAD])
 def test_generates_valid_part(engine: MidiGptEngine, role: Role) -> None:
     spec = GenerationSpec(

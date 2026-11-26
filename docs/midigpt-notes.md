@@ -93,11 +93,16 @@ Score.from_midi(path) / from_bytes(data) / to_midi(path) / resample(tpq) / to_di
 - Runtime introspection (same as the HTTP `/info` handler): `engine._analyzer.attribute_sizes()`, `.attribute_value_labels()`, `.attribute_levels()`, `.attribute_track_types()`; `json.loads(engine._tokenizer._vocab.config().to_json())["num_bars_map"]`; `engine._model.max_context()`.
 - Attribute registry names (which ones a checkpoint uses is pending): `note_density`, `onset_polyphony`, `pitch_range`, `key_signature`, `note_duration_dist`, `silence_proportion`, `pitch_class_set`, `note_density_quantile`, `polyphony_quantile`, `note_duration_quantile`, `tension`, `tension_drum`, `nomml`.
 
+## M2 findings
+
+- **`bar_controls` only honours `time_signature`.** A `pitch_mask` inside `bar_controls` passes `validate_request` but is silently ignored by `SamplingSession` (it reads only `time_signature` there). `pitch_mask` works **only** in track-level `TrackPrompt.controls`, one mask per step. Per-bar *attributes* (`bar_attributes`, e.g. `bar_max_polyphony`) are honoured. The adapter therefore sends one track-level mask: key scale (or union of chord tones when there is no key) + role range as a `uniform` shape. Regression tests: `tests/gen/test_adapter.py::test_pitch_mask_is_track_level_not_bar_level`, `tests/inference/test_pipeline.py::test_raw_output_respects_pitch_mask`.
+- **Chord following is weak.** With the mask applied, raw bass stays in scale and in range on both models, but on Am–F–C–G the best candidates are pedal tones on A (prism) or busy single-note lines (yellow): CT ≈ 0.5. Candidates for improvement later: more candidates (N=8), stronger chord context, generating bar by bar with per-bar masks (costs latency), or a higher CT weight for bass. Not addressed in M2.
+
 ## Implications for M2
 
 - **Resolution:** decoded scores come back at **resolution 1920**, whatever the input resolution was. The adapter must call `score.resample(480)` on every result before converting to clip notes (`scripts/m1_spike.py` does this).
 - **Bar-relative onsets:** convert clip-relative ticks ↔ (bar index, onset within bar) in `adapter.py` via `core/timebase.py`.
 - **Model differences:** `prism_medium` supports key, pitch range, bar-level pitch class set and genre; `yellow_medium` only polyphony, note duration and drum density. Build controls from `attribute_sizes()` at runtime, never hard-coded.
 
-- `pitch_mask` with the bar's chord/scale pitch classes plus a `uniform` shape on the role range gives hard harmonic/range guidance even when the model has no chord attribute (relevant for `yellow_medium`). The post-processor and scorer remain the source of truth.
+- `pitch_mask` (track-level, see *M2 findings*) with the scale's pitch classes plus a `uniform` shape on the role range gives hard key/range guidance even when the model has no key attribute (relevant for `yellow_medium`). The post-processor and scorer remain the source of truth.
 - `num_candidates` + `run_variations()` can implement the N-candidate loop in one call; SSE note streaming then only works for N=1, so stream progress (not notes) for N>1.

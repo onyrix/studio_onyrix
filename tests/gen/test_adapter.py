@@ -12,7 +12,7 @@ from app.gen.adapter import (
     choose_window,
     extract_notes,
     key_signature_index,
-    pitch_mask_for_bar,
+    pitch_mask,
 )
 
 pytest.importorskip("midigpt")
@@ -85,12 +85,25 @@ def test_build_score_splits_bars_relative() -> None:
     assert score.tracks[1].instrument == 33
 
 
-def test_pitch_mask_uses_chord_for_bass_and_scale_for_lead() -> None:
-    bass = pitch_mask_for_bar(bass_spec(), 1)
-    assert bass["pitch_classes"] == sorted(parse_chord("F").pitch_class_set)
+def test_pitch_mask_uses_scale_and_role_range() -> None:
+    bass = pitch_mask(bass_spec())
+    assert bass["pitch_classes"] == [0, 2, 4, 5, 7, 9, 11]  # A minor scale
     assert bass["shape"] == {"type": "uniform", "min": 28, "max": 55}
-    lead = pitch_mask_for_bar(bass_spec(target_role=Role.LEAD, target_spec=role_spec(Role.LEAD)), 1)
-    assert lead["pitch_classes"] == [0, 2, 4, 5, 7, 9, 11]  # A minor scale
+    lead = pitch_mask(bass_spec(target_role=Role.LEAD, target_spec=role_spec(Role.LEAD)))
+    assert lead["shape"] == {"type": "uniform", "min": 60, "max": 96}
+
+
+def test_pitch_mask_without_key_uses_union_of_chord_tones() -> None:
+    mask = pitch_mask(bass_spec(key=None))
+    expected = set().union(*(parse_chord(c).pitch_class_set for c in ("Am", "F", "C", "G")))
+    assert mask["pitch_classes"] == sorted(expected)
+
+
+def test_pitch_mask_is_track_level_not_bar_level() -> None:
+    """Regression: midigpt ignores pitch_mask inside bar_controls (only time_signature is read)."""
+    target = build_request(bass_spec(), 1, PRISM).tracks[1]
+    assert target.bar_controls == {}
+    assert target.controls["pitch_mask"] == pitch_mask(bass_spec())
 
 
 def test_request_for_prism_uses_bar_attributes_key_and_genre() -> None:
@@ -99,7 +112,7 @@ def test_request_for_prism_uses_bar_attributes_key_and_genre() -> None:
     assert target.bars == [0, 1, 2, 3]
     assert target.attributes == {"key_signature": 21}
     assert target.bar_attributes[0] == {"bar_max_polyphony": 0}
-    assert "pitch_mask" in target.bar_controls[3]
+    assert "pitch_mask" in target.controls
     assert request.tracks[0].bars == []
     assert request.controls == {"genre": "jazz"}
     assert request.config.seed == 11 and request.config.num_candidates == 4
@@ -119,7 +132,7 @@ def test_drum_density_mapping() -> None:
     assert build_request(spec, 1, YELLOW).tracks[1].attributes == {"note_density": 7}
     prism_target = build_request(spec, 1, PRISM).tracks[1]
     assert prism_target.bar_attributes[2] == {"bar_note_density": 7}
-    assert prism_target.bar_controls == {}
+    assert prism_target.controls == {}  # no pitch mask on drums
 
 
 def test_extract_notes_resamples_and_flattens() -> None:

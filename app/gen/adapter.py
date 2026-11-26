@@ -16,8 +16,6 @@ from app.core.model import ChordSlot, Key, Mode, Note, Role
 from app.core.roles import RoleSpec
 from app.core.timebase import FOUR_FOUR, PPQ, TimeSignature, bar_ticks, bpm_to_us_per_quarter
 
-HARMONIC_ROLES = frozenset({Role.BASS, Role.CHORDS, Role.PAD})
-
 
 @dataclass(frozen=True)
 class ContextTrack:
@@ -128,19 +126,21 @@ def build_score(spec: GenerationSpec) -> tuple[Any, int]:
     return score, len(tracks) - 1
 
 
-def pitch_mask_for_bar(spec: GenerationSpec, bar: int) -> dict[str, Any]:
-    """Hard pitch classes (chord for harmonic roles, scale for the others) + role range shape."""
+def pitch_mask(spec: GenerationSpec) -> dict[str, Any]:
+    """Track-level pitch mask: the key's scale (else the union of the chord tones) as hard pitch
+    classes, plus the role range as a uniform shape.
+
+    midigpt 0.4.2 honours `pitch_mask` only in track-level `controls`; inside `bar_controls` it
+    passes validation but is ignored (only `time_signature` is read there). Chord-by-chord
+    guidance therefore comes from context tracks and the scorer, not from the mask.
+    """
     mask: dict[str, Any] = {
         "shape": {"type": "uniform", "min": spec.target_spec.low, "max": spec.target_spec.high}
     }
-    chord = spec.chords[bar % len(spec.chords)] if spec.chords else None
-    pcs: frozenset[int] | None = None
-    if spec.target_role in HARMONIC_ROLES and chord is not None:
-        pcs = chord.pitch_class_set
-    elif spec.key is not None:
+    if spec.key is not None:
         pcs = scale_pitch_classes(spec.key)
-    elif chord is not None:
-        pcs = chord.pitch_class_set
+    else:
+        pcs = frozenset().union(*(c.pitch_class_set for c in spec.chords if c is not None))
     if pcs:
         mask["pitch_classes"] = sorted(pcs)
     return mask
@@ -158,7 +158,7 @@ def build_request(spec: GenerationSpec, target_index: int, caps: ModelCaps) -> A
     bars = list(range(spec.bars))
     attributes: dict[str, int] = {}
     bar_attributes: dict[int, dict[str, int]] = {}
-    bar_controls: dict[int, dict[str, Any]] = {}
+    track_controls: dict[str, Any] = {}
 
     def set_attr(names: tuple[str, str], value: int) -> None:
         bar_name, track_name = names
@@ -174,8 +174,7 @@ def build_request(spec: GenerationSpec, target_index: int, caps: ModelCaps) -> A
             attributes["key_signature"] = key_signature_index(spec.key)
         if spec.target_spec.monophonic:
             set_attr(("bar_max_polyphony", "max_polyphony"), 0)  # level 0 = "1 voice"
-        for b in bars:
-            bar_controls[b] = {"pitch_mask": pitch_mask_for_bar(spec, b)}
+        track_controls["pitch_mask"] = pitch_mask(spec)
     elif spec.density is not None:
         set_attr(("bar_note_density", "note_density"), spec.density)
 
@@ -186,7 +185,7 @@ def build_request(spec: GenerationSpec, target_index: int, caps: ModelCaps) -> A
             bars=bars,
             attributes=attributes,
             bar_attributes=bar_attributes,
-            bar_controls=bar_controls,
+            controls=track_controls,
         )
     )
     controls: dict[str, Any] = {}
