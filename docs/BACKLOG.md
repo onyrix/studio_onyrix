@@ -15,8 +15,12 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | M1 | Model spike | ✅ | `scripts/m1_spike.py`, findings in `docs/midigpt-notes.md`. |
 | M2 | Adapter, engine, candidates, scorer, post-processing, `/generate` + SSE | ✅ | 4 candidates, best by S, same seed ⇒ same notes, with the real model too. |
 | M3 | Vanilla frontend: arrangement timeline, transport, playback, export | ✅ | Playback confirmed audible by the user (2026-11-26). Tone.js timbres judged poor → replaced by SpessaSynth + SoundFont banks (B-01…B-04). |
-| M4 | Clip editor, replace / vary / lock / history, section reorder + duplicate | ⬜ | Next milestone. Items B-10…B-19. |
-| M5 | Import `.mid`, rule-based planner, benchmark | ⬜ | Items B-40…B-42. |
+| C1 | Harmony: chord lane, diatonic chords, suggestions (rule-based planner) | 🟡 | Next. Items B-60…B-64. Order decided 2026-11-26: C1 → C2 → C3 → C4 → M4 → M5. |
+| C2 | Harmony adherence + benchmark | ⬜ | Items B-20, B-70…B-74. |
+| C3 | Prompt per part ("Regenerate with note") | ⬜ | Items B-16, B-80…B-84. |
+| C4 | Song from prompt + "Generate all" | ⬜ | Items B-21, B-22, B-41, B-90…B-94. |
+| M4 | Clip editor, replace / vary / lock / history, section reorder + repeat / duplicate | ⬜ | After C4. Items B-10…B-19. |
+| M5 | Import `.mid`, benchmark | ⬜ | Items B-40, B-42 (planner moved to C1/C4). |
 | M6 | Packaging (PyInstaller, pywebview, CI matrix) | ⬜ | Items B-50…B-51. |
 
 ## Open decisions
@@ -24,9 +28,10 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | ID | Question | Options | Blocks |
 |---|---|---|---|
 | D1 ✅ | Which JS SoundFont synth and which banks? | **Decided (2026-11-26):** SpessaSynth (Apache-2.0) + MuseScore General (MIT) as default bank, user import for any other bank. Criteria: maximum quality, import of downloaded banks, open source. `docs/audio-playback.md`. | — |
-| D2 ❓ | What does "Duplicate section" do? | (a) new instance of the same section, edits apply everywhere (current model); (b) independent copy; (c) both, as two commands. | B-10 |
-| D3 ❓ | How should bass/harmony follow chord changes? | More candidates (N=8); bar-by-bar generation with per-bar masks (slower); higher CT weight for bass; stronger chord context. | B-20 |
-| D4 ❓ | What is "Regenerate with note" (CLAUDE.md §8)? | Free-text hint mapped to controls (density, register…) or passed to the LLM planner. | B-16 |
+| D2 ✅ | What does "Duplicate section" do? | **Decided (2026-11-26):** two commands — "Repeat" (new instance of the same section, edits apply everywhere) and "Duplicate as new" (independent copy). | — |
+| D3 ✅ | How should bass/harmony follow chord changes? | **Decided (2026-11-26):** all layers, CLAUDE.md §6.8 — `pitch_class_set` spike, deterministic harmonic snap, optional strict-harmony block generation, per-role CT weight + N=8 on yellow. | — |
+| D4 ✅ | What is "Regenerate with note" (CLAUDE.md §8)? | **Decided (2026-11-26):** free-text prompt → structured `GenerationIntent` (CLAUDE.md §6.7), keyword interpreter offline, local Ollama when available. | — |
+| D6 ✅ | Which LLM backend? | **Decided (2026-11-26):** local Ollama only, stdlib HTTP, rule-based fallback. | — |
 | D5 ❓ | Should the master export include muted tracks? | Today: yes (mute = playback state only). Alternative: skip muted, or ask at export. | B-36 |
 
 ## P1 — next up
@@ -39,7 +44,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | B-04 | "Suoni" dialog: import, choose active, delete, licence notes | ✅ | (`b7f76d7`). |
 | B-05 | Listen to the new playback in a real browser (section, loop, play all, mute/solo, bank switch) | 🟡 | Headless browsers cannot run the AudioWorklet. |
 | B-06 | Optional: per-project bank, reverb/chorus amount, master volume | ⬜ | P3 ideas, not requested yet. |
-| B-10 | Section commands in the timeline: rename, duplicate (per D2), delete instance, insert a new section at a position | ❓ D2 | API exists: `PATCH /sections/{id}`, `PUT /projects/{id}/arrangement`, `DELETE /sections/{id}`. |
+| B-10 | Section commands in the timeline: rename, repeat / duplicate as new (D2), delete instance, insert a new section at a position | ⬜ | API exists: `PATCH /sections/{id}`, `PUT /projects/{id}/arrangement`, `DELETE /sections/{id}`. |
 | B-11 | Drag section blocks to reorder | ⬜ | `PUT /projects/{id}/arrangement`. |
 | B-12 | Lock / unlock a part in the UI | ⬜ | API exists (`PATCH /clips/{id}` `locked`). Locked parts are never regenerated and always used as context. |
 | B-13 | **Vary**: `POST /generate/vary` + button | ⬜ | Next-best candidate from the last generation; candidates already kept in memory (`app.state.candidates`). |
@@ -50,11 +55,11 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | ID | Item | Status | Notes |
 |---|---|---|---|
 | B-15 | **Replace**: set a part to another existing clip | ⬜ | Endpoint missing. |
-| B-16 | Regenerate with note | ❓ D4 | |
+| B-16 | Regenerate with note | ⬜ | → C3 (B-80…B-84). |
 | B-17 | Clip editor: piano roll on canvas (pan/zoom, draw/move/resize/delete, snap to 16th) | ⬜ | Saves a `manual` version via `PATCH /clips/{id}` `notes`. 60 fps for 64 bars × 6 tracks. |
 | B-18 | Drum step grid for drum tracks | ⬜ | `core/drums.py` has grid ↔ notes. |
 | B-19 | M4 acceptance: full replace / move / assemble flow without reload | ⬜ | |
-| B-20 | Bass and harmonic parts follow chord changes | ❓ D3 | Today CT ≈ 0.5 on Am–F–C–G; best bass is often a pedal on the tonic. |
+| B-20 | Bass and harmonic parts follow chord changes | ⬜ → C2 | Today CT ≈ 0.5 on Am–F–C–G; best bass is often a pedal on the tonic. |
 | B-21 | Use **neighbouring sections** as context within the model window | ⬜ | CLAUDE.md §6.1; today only the other parts of the same section are context. |
 | B-22 | Test and fix sections longer than the largest window (16 bars prism, 8 yellow) | ⬜ | Relies on the library's windowing; "2 bars overlap, earlier window wins" not verified with the real model. |
 | B-30 | Delete projects, tracks and sections from the UI | ⬜ | API exists. |
@@ -71,12 +76,37 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | B-32 | Dev mode with a fake engine, to work on the UI without loading the model | ⬜ | e.g. `ONYRIX_ENGINE=fake`. |
 | B-36 | Muted tracks in the master export | ❓ D5 | |
 
+## Composition roadmap (C1–C4)
+
+| ID | Item | Status |
+|---|---|---|
+| B-60 | `core/harmony`: `chord_symbol` (inverse of `parse_chord`), `diatonic_chords`, `roman_numeral`, `suggest_next` (functional, secondary dominant, modal borrowing, tritone sub, relative) | ⬜ |
+| B-61 | `RuleBasedPlanner.suggest_progressions` per mode × genre × section kind, length variants, cadences | ⬜ |
+| B-62 | `/harmony/diatonic`, `/harmony/suggest`, `/harmony/next` | ⬜ |
+| B-63 | Chord lane in the timeline: per-section grid editing with server validation | ⬜ |
+| B-64 | Suggestion popovers: progression for the selected section, chord change on a bar | ⬜ |
+| B-70 | Spike: what do prism's 13 `pitch_class_set` levels encode? Use per bar if possible | ⬜ |
+| B-71 | `postprocess.harmonic_snap` (role-aware, idempotent, property-tested) | ⬜ |
+| B-72 | Strict harmony mode: block generation aligned to chord changes, per-block `pitch_mask` | ⬜ |
+| B-73 | Per-role scorer weights; N=8 default on `yellow_medium` | ⬜ |
+| B-74 | Benchmark CT / S / latency per role × mode (raw, snap, strict, strict+snap) | ⬜ |
+| B-80 | `core/intent.GenerationIntent` + clamping | ⬜ |
+| B-81 | `KeywordInterpreter` (it/en) and `OllamaInterpreter` (stdlib HTTP, JSON schema, fallback) | ⬜ |
+| B-82 | Intent → midigpt controls via `ModelCaps` (durations, polyphony, silence, register, rhythm mask, remix) and scorer targets | ⬜ |
+| B-83 | `/generate` `prompt`; prompt + resolved intent in version params; `/llm/status` | ⬜ |
+| B-84 | UI "Regenerate with note" with quick chips, resolved intent shown | ⬜ |
+| B-90 | `Plan` model, `RuleBasedPlanner.plan` and `LLMPlanner` (validated, repaired) | ⬜ |
+| B-91 | `/projects/{id}/plan` preview + `/plan/apply` | ⬜ |
+| B-92 | `/projects/{id}/generate-all`: one cancellable job, §6.1 order, per-cell SSE, skips locked / filled | ⬜ |
+| B-93 | Section energy → intent; drum fill on the last bar; velocity by energy | ⬜ |
+| B-94 | UI: "New song from prompt" dialog and "Generate all" | ⬜ |
+
 ## M5 — work items
 
 | ID | Item | Status |
 |---|---|---|
 | B-40 | `POST /import/midi`: import a `.mid` as clips (context or content) | ⬜ |
-| B-41 | `RuleBasedPlanner` behind the `Planner` interface; `LLMPlanner` optional, off unless configured | ⬜ |
+| B-41 | `RuleBasedPlanner` / `LLMPlanner` | → C1 (B-61) and C4 (B-90) |
 | B-42 | `scripts/benchmark_models.py` (stub today): mean S and latency per model over 20 runs; `make bench` | ⬜ |
 
 ## M6 — work items

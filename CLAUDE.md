@@ -188,7 +188,17 @@ GM drum map: kick 36, snare 38, clap 39, closed hat 42, pedal hat 44, open hat 4
 
 ### 6.6 Planner (optional, behind an interface)
 
-`Planner.plan(genre, key, bpm, structure) -> {chord_grid, sections, per_bar_controls}`. Implementations: `RuleBasedPlanner` (default, no network, common progressions per mode) and `LLMPlanner` (calls an external LLM API, key read from env, disabled unless configured). The generator never depends on a specific planner.
+`Planner.plan(...) -> Plan` (sections with kind, bars, chord grid, energy and per-role intent; suggested tracks) and `Planner.suggest_progressions(key, genre, section_kind, bars, n)`. Implementations: `RuleBasedPlanner` (default, no network, progressions per mode × genre × section kind, cadences at section ends) and `LLMPlanner`. The generator never depends on a specific planner.
+
+**LLM backend = local Ollama only** (`ONYRIX_LLM_URL`, default `http://127.0.0.1:11434`; `ONYRIX_LLM_MODEL`). Called with stdlib `urllib` (no SDK dependency), JSON-schema structured output, short timeout. If Ollama is unreachable every LLM feature falls back to the rule-based path: the app always works offline. LLM output is validated and corrected like model output (chords through `parse_chord`, bar limits, clamped intents); never trust it raw.
+
+### 6.7 Prompts and intents
+
+A free-text prompt ("più sparso, basso in ottavi", "melodia più alta") is interpreted into a structured `GenerationIntent` (`core/intent.py`: density, register, rhythm, note length, polyphony, silence, variation, bass style, strict harmony, humanize, temperature) by a `PromptInterpreter` (`gen/prompting.py`: `KeywordInterpreter` it/en offline, `OllamaInterpreter` when available). Explicit controls win over the prompt. The intent is mapped to midigpt attributes/controls via the runtime `ModelCaps`, and to scorer targets. The prompt **and the resolved intent** are stored in `ClipVersion.params`, so a version is reproducible even though the LLM is not.
+
+### 6.8 Harmony adherence
+
+Layered, all deterministic after the model: (1) bar-level `pitch_class_set` attribute when the checkpoint supports it; (2) `postprocess.harmonic_snap`: out-of-chord notes on strong beats move to the nearest chord tone in range (bass: optional root on the downbeat; chords/pad: notes sounding across a chord change are realigned; lead: strong beats only); (3) optional **strict harmony** mode: the section is generated in blocks aligned to chord changes, each block an infill with a track-level `pitch_mask` = that chord (slower); (4) per-role scorer weights (higher CT for bass/chords), N=8 on `yellow_medium`.
 
 ---
 
@@ -204,8 +214,16 @@ PUT    /projects/{id}/arrangement           # ordered section instance list
 GET    /projects/{id}/clips                 # every clip with its current notes (UI bulk load)
 GET    /clips/{id}              ; PATCH /clips/{id}          # notes edit, lock
 GET    /clips/{id}/versions     ; POST /clips/{id}/restore/{version_id}
-POST   /generate                            # {section_id, track_id, bars, controls, n_candidates, seed?}
+POST   /sections/{id}/duplicate             # independent copy (new section, copied clips); "repeat" = PUT arrangement
+POST   /generate                            # {section_id, track_id, bars, controls, n_candidates, seed?, prompt?}
 POST   /generate/vary                       # next-best candidate from the last generation
+POST   /projects/{id}/generate-all          # one job over every (section, track) cell in §6.1 order; skips locked
+GET    /harmony/diatonic?tonic=&mode=       # diatonic chords with roman numerals
+POST   /harmony/suggest                     # progressions for a section (rules; LLM when available and prompted)
+POST   /harmony/next                        # suggested chord changes after/instead of a chord
+POST   /projects/{id}/plan                  # song plan preview from a prompt (no writes)
+POST   /projects/{id}/plan/apply            # create sections, arrangement and tracks from a plan
+GET    /llm/status                          # Ollama reachable? model name
 GET    /export/project/{id}.mid             # master multitrack; ?start=&end= instance range, &loop=true adds CC116/117 loop markers (playback)
 GET    /export/track/{id}.mid               # single track over the arrangement
 POST   /import/midi                         # import .mid as clips (context or content)
@@ -223,7 +241,7 @@ GET    /soundfonts/{id}/file ; PUT /soundfonts/active ; DELETE /soundfonts/{id}
 
 Three views only. Keep it simple; resist adding more.
 
-1. **Arrangement**: a DAW-style timeline. Time runs left to right with a bar ruler on top; **rows = tracks** (name, role, mute/solo on the left, sticky while scrolling); **section instances are blocks of bars** whose width is proportional to their length, in arrangement order. The block where a track row meets a section instance is that track's part (clip) in the section, with `Generate / Vary / Regenerate with note / Lock / Replace`. A repeated section shows the same parts in every instance. Click a section header to select it; drag to reorder sections, duplicate instance, rename. Horizontal zoom (px per bar) and a playhead that moves with the transport.
+1. **Arrangement**: a DAW-style timeline. Time runs left to right with a bar ruler on top; **rows = tracks** (name, role, mute/solo on the left, sticky while scrolling); **section instances are blocks of bars** whose width is proportional to their length, in arrangement order. The block where a track row meets a section instance is that track's part (clip) in the section, with `Generate / Vary / Regenerate with note / Lock / Replace`. A repeated section shows the same parts in every instance. Click a section header to select it; drag to reorder sections, duplicate instance, rename. Horizontal zoom (px per bar) and a playhead that moves with the transport. A **chord lane** above the tracks shows one chord per bar; editing it edits the section's grid, with suggested progressions and chord changes. A "new song from prompt" dialog previews and applies a plan; "Generate all" fills every cell.
 2. **Clip editor**: minimal piano roll (canvas, pan/zoom, draw/move/resize/delete, snap to 16th) and a drum step grid for drum tracks.
 3. **Transport + export**: play section / play all, loop selected section, tempo display, export buttons.
 
@@ -256,11 +274,15 @@ Rules:
 | M1 | **Model spike**: load `yellow_medium` and `prism_medium`, inspect `Score` types and attribute names, round-trip project → Score → `.mid` | A script generates 4 bars of bass on a 4-chord grid and writes a valid `.mid`; findings written to `docs/midigpt-notes.md` |
 | M2 | Adapter, engine, candidates, scorer, post-processing; `/generate` with SSE | 4 candidates per request, best chosen by `S`, reproducible with the same seed |
 | M3 | Frontend skeleton (vanilla, no build): Arrangement view, transport, SoundFont playback, export | A generated 8-bar loop is audible in the browser and exports a correct `.mid` |
-| M4 | Clip editor, replace / vary / lock / history, section reorder + duplicate | Full replace/move/assemble flow works without reload |
-| M5 | Import `.mid` as context, planner (rule-based), benchmark script | `make bench` prints mean `S` and latency per model over 20 runs |
+| C1 | Harmony: per-section chord lane, diatonic chords, suggested progressions and chord changes (`RuleBasedPlanner`) | From the UI, each section's grid can be written or replaced by an accepted suggestion |
+| C2 | Harmony adherence (§6.8) + benchmark of CT/S/latency per mode | `make bench` shows mean bass CT ≥ 0.8 on Am–F–C–G (was ≈ 0.5) with no S regression |
+| C3 | Prompt per part ("Regenerate with note", §6.7) | A prompt measurably changes density / register / rhythm; prompt and resolved intent stored in the version |
+| C4 | Song from prompt (planner, Ollama optional) + "Generate all" + neighbouring-section context | From prompt + bpm + key: structure, chords per section, tracks and every part, cancellable, without reload |
+| M4 | Clip editor, replace / vary / lock / history, section reorder + repeat / duplicate | Full replace/move/assemble flow works without reload |
+| M5 | Import `.mid` as context, benchmark script | `make bench` prints mean `S` and latency per model over 20 runs |
 | M6 | Packaging: PyInstaller via CI matrix, pywebview window | Installable artifact per OS |
 
-Work milestone by milestone. Do not start M(n+1) before M(n) acceptance passes.
+Order (decided 2026-11-26): C1 → C2 → C3 → C4 → M4 → M5 → M6, composition before editing. Work milestone by milestone; do not start the next one before the current acceptance passes.
 
 ---
 
@@ -272,6 +294,7 @@ Work milestone by milestone. Do not start M(n+1) before M(n) acceptance passes.
 - **Attribute and field names** of `midigpt` are verified at runtime (M1), not assumed.
 - **No chord conditioning in `yellow_medium`.** When it is the active model, harmony coherence comes only from context tracks and from the scorer's `CT`; use more candidates (N=8).
 - **Latency** is unmeasured until M5; do not promise numbers in the UI.
+- **Local LLM quality varies.** Ollama models differ in how well they follow JSON schemas and music theory. Every LLM answer is validated and repaired by rules; the keyword interpreter and `RuleBasedPlanner` must stay good enough on their own.
 - **Sound bank licences.** Only banks whose licence allows it are downloaded by the app (MuseScore General, MIT). Banks such as Timbres of Heaven (non-commercial, no redistribution) are only imported by the user; never host or bundle them.
 - **Playback = export.** The browser plays the server-exported MIDI through SpessaSynth, so playback and the DAW export cannot drift. The JS channel map (`web/js/lib/player.js` `channelMap`) must mirror `app/midi_io.py` `_channels`.
 - **Headless browsers cannot verify live audio.** In headless Chrome the audio thread does not run (AudioWorklet modules never load, the clock stays at 0). Verify synthesis offline with `spessasynth_core` (`SpessaSynthProcessor` + `SpessaSynthSequencer` on the main thread) and confirm live playback by ear.
