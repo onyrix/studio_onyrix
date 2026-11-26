@@ -16,6 +16,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | M2 | Adapter, engine, candidates, scorer, post-processing, `/generate` + SSE | ✅ | 4 candidates, best by S, same seed ⇒ same notes, with the real model too. |
 | M3 | Vanilla frontend: arrangement timeline, transport, playback, export | ✅ | Playback confirmed audible by the user (2026-11-26). Tone.js timbres judged poor → replaced by SpessaSynth + SoundFont banks (B-01…B-04). |
 | C1 | Harmony: chord lane, diatonic chords, suggestions (rule-based planner) | ✅ | Chord lane + chord dialog checked in headless Chrome (2026-11-26). Order decided 2026-11-26: C1 → C2 → C3 → C4 → M4 → M5. |
+| H | **Harmonic explorer** (progression picker: library + corpus + generator + prompt) | ❓ D7 | **Top priority (user, 2026-11-26)**, before finishing C2. Items B-55…B-59. |
 | C2 | Harmony adherence + benchmark | 🟡 | Items B-20, B-70…B-74. |
 | C3 | Prompt per part ("Regenerate with note") | ⬜ | Items B-16, B-80…B-84. |
 | C4 | Song from prompt + "Generate all" | ⬜ | Items B-21, B-22, B-41, B-90…B-94. |
@@ -32,7 +33,18 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | D3 ✅ | How should bass/harmony follow chord changes? | **Decided (2026-11-26):** all layers, CLAUDE.md §6.8 — `pitch_class_set` spike, deterministic harmonic snap, optional strict-harmony block generation, per-role CT weight + N=8 on yellow. | — |
 | D4 ✅ | What is "Regenerate with note" (CLAUDE.md §8)? | **Decided (2026-11-26):** free-text prompt → structured `GenerationIntent` (CLAUDE.md §6.7), keyword interpreter offline, local Ollama when available. | — |
 | D6 ✅ | Which LLM backend? | **Decided (2026-11-26):** local Ollama only, stdlib HTTP, rule-based fallback. | — |
+| D7 ❓ | How should the progression picker work? | Curated library only; corpus (Chordonomicon, MIT, 666k songs with verse/chorus/bridge labels; ChoCo, mostly CC-BY) imported locally; statistical generator with an "audacity" control; operators (substitutions, modulations, harmonic rhythm); prompt via Ollama mapped to parameters. Proposal: all of them, layered (see B-55…B-59). | B-55…B-59 |
 | D5 ❓ | Should the master export include muted tracks? | Today: yes (mute = playback state only). Alternative: skip muted, or ask at export. | B-36 |
+
+## H — Harmonic explorer (next up, pending D7)
+
+| ID | Item | Status |
+|---|---|---|
+| B-55 | Harmonic rhythm: chord events with duration (½, 1, 2 bars) instead of one chord per bar; migration + chord lane + generator | ⬜ |
+| B-56 | Built-in curated library (ours, roman numerals, tags: genre, mood, section, energy) with "song kits" (verse / pre / chorus / bridge that belong together) + audition of a progression | ⬜ |
+| B-57 | Optional corpus import into `data/` (git-ignored, never bundled): Chordonomicon / ChoCo → roman numerals by section → n-gram statistics; search by pattern | ⬜ |
+| B-58 | Generator + transformation operators (substitutions, borrowed chords, chromatic mediants, modulation for the last chorus, pedal, deceptive cadence) with "audacity" control and a surprise meter | ⬜ |
+| B-59 | Prompt → harmonic parameters (Ollama, keyword fallback) → ranked candidates with an explanation | ⬜ |
 
 ## P1 — next up
 
