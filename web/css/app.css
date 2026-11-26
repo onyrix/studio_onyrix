@@ -530,3 +530,80 @@ dialog::backdrop {
     margin-left: 0;
   }
 }
+
+/* Sounds dialog */
+dialog.wide {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.form h3 {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bank-list,
+.suggest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bank-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.bank-choice {
+  display: flex;
+  flex: 1;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  min-width: 0;
+}
+
+.bank-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bank-meta {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.busy-line {
+  margin: 0;
+  color: var(--accent);
+}
+
+.file-pick input {
+  padding: 6px;
+}
+
+.suggest-list a {
+  color: var(--accent);
+}
+
+.sound-button {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

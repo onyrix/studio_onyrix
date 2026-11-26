@@ -3,29 +3,56 @@
 import { showError } from "../lib/actions.js";
 import { h } from "../lib/dom.js";
 import { t } from "../lib/i18n.js";
-import { isPlaying, onStop, play, positionSeconds, stop } from "../lib/player.js";
+import { applyMutes, isPlaying, onStop, play, positionSeconds, stop } from "../lib/player.js";
 import { getState, setState } from "../lib/store.js";
 import { PPQ, barTicks, secondsToTicks } from "../lib/timebase.js";
 import { ZOOM_LEVELS } from "./arrangement.js";
 
 onStop(() => setState({ playing: null }));
 
+/** @param {string} id */
+function openDialog(id) {
+  const dialog = /** @type {HTMLDialogElement | null} */ (document.getElementById(id));
+  dialog?.dispatchEvent(new Event("prepare"));
+  dialog?.showModal();
+}
+
+/** True if any part in the given instances has notes. @param {number[]} indexes */
+function hasNotes(indexes) {
+  const { project, clips } = getState();
+  if (!project) return false;
+  const sections = new Map(project.sections.map((s) => [s.id, s]));
+  return indexes.some((i) => {
+    const section = sections.get(project.arrangement[i]);
+    return Object.values(section?.slots ?? {}).some(
+      (clipId) => (clips[clipId]?.current_version?.notes ?? []).length > 0,
+    );
+  });
+}
+
 /** @param {"section" | "all"} mode */
 async function start(mode) {
-  const { project, clips, selected, loop } = getState();
-  if (!project) return;
+  const { project, selected, loop, soundfonts } = getState();
+  if (!project || !project.arrangement.length) return;
   const indexes = mode === "section" ? [selected] : project.arrangement.map((_, i) => i);
+  if (!hasNotes(indexes)) {
+    setState({ message: t("transport.nothing") });
+    return;
+  }
+  const bankId = soundfonts?.active;
+  if (!bankId) {
+    setState({ message: t("sound.needBank") });
+    openDialog("dialog-sounds");
+    return;
+  }
   // Bars before the first played instance: where the playhead starts on the timeline.
   const bars = new Map(project.sections.map((s) => [s.id, s.bars]));
   const playFromBar = project.arrangement
-    .slice(0, indexes[0] ?? 0)
+    .slice(0, indexes[0])
     .reduce((sum, id) => sum + (bars.get(id) ?? 0), 0);
-  const total = await play(project, clips, indexes, { loop });
-  setState(
-    total
-      ? { playing: mode, playFromBar, message: "" }
-      : { playing: null, message: t("transport.nothing") },
-  );
+  setState({ message: t("sound.preparing") });
+  await play(project, indexes, { loop, bankId });
+  setState({ playing: mode, playFromBar, message: "" });
 }
 
 /** @param {number} direction -1 = zoom out, +1 = zoom in */
@@ -70,7 +97,9 @@ export function renderTransport(root, state) {
   const project = state.project;
   root.replaceChildren();
   if (!project) return;
+  if (isPlaying()) applyMutes([...project.tracks].sort((a, b) => a.position - b.position));
   const playing = state.playing;
+  const bank = state.soundfonts?.banks.find((b) => b.active);
   positionEl = h("span.position", { "aria-live": "off" });
   root.append(
     h(
@@ -130,6 +159,12 @@ export function renderTransport(root, state) {
         },
         "+",
       ),
+    ),
+    h(
+      "button.sound-button",
+      { type: "button", title: t("sound.title"), onclick: () => openDialog("dialog-sounds") },
+      "♫ ",
+      bank ? bank.name : t("sound.noneShort"),
     ),
     h(
       "a.button.export",

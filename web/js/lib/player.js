@@ -1,163 +1,23 @@
-// Browser playback with Tone.js (vendored UMD build, global `Tone`).
-// Notes are scheduled on Tone.Transport, converting ticks to seconds from the project tempo.
-// Mute/solo are applied here, client-side. Timbres are Tone's built-in synths per role
-// (a General MIDI SoundFont synth is a later step).
-
-import { barTicks, ticksToSeconds } from "./timebase.js";
-
-/** @type {any} */
-const Tone = /** @type {any} */ (globalThis).Tone;
+// Browser playback with SpessaSynth (vendored, Apache-2.0) and a SoundFont/DLS bank.
+// The browser plays the very MIDI file the server exports (same notes, tempo, programs and
+// channels as the DAW export), so what you hear is what you get. Mute/solo mute MIDI channels.
+// SpessaSynth is imported lazily on the first play to keep page load light.
 
 /** @typedef {import("./store.js").Project} Project */
-/** @typedef {import("./store.js").Clip} Clip */
 /** @typedef {import("./store.js").Track} Track */
 
-/** @type {Map<number, {role: string, trigger: (pitch: number, dur: number, time: number, vel: number) => void, dispose: () => void}>} */
-const instruments = new Map();
+const PROCESSOR_URL = "/vendor/spessasynth/spessasynth_processor.min.js";
+const DRUM_CHANNEL = 9;
 
-/** @param {number} midi */
-const freq = (midi) => Tone.Frequency(midi, "midi").toFrequency();
-
-function makeDrums() {
-  const out = new Tone.Volume(-6).toDestination();
-  const kick = new Tone.MembraneSynth({ pitchDecay: 0.03, octaves: 6 }).connect(out);
-  const tom = new Tone.MembraneSynth({ pitchDecay: 0.02, octaves: 3 }).connect(out);
-  const snare = new Tone.NoiseSynth({
-    noise: { type: "white" },
-    envelope: { attack: 0.001, decay: 0.15, sustain: 0 },
-  }).connect(out);
-  const hat = new Tone.MetalSynth({
-    envelope: { attack: 0.001, decay: 0.06, release: 0.01 },
-    harmonicity: 5.1,
-    modulationIndex: 32,
-    resonance: 4000,
-    octaves: 1.5,
-  }).connect(new Tone.Volume(-14).connect(out));
-  const parts = [out, kick, tom, snare, hat];
-  return {
-    /** @param {number} pitch @param {number} dur @param {number} time @param {number} vel */
-    trigger(pitch, dur, time, vel) {
-      if (pitch === 35 || pitch === 36) kick.triggerAttackRelease("C1", "16n", time, vel);
-      else if (pitch >= 37 && pitch <= 40) snare.triggerAttackRelease("16n", time, vel);
-      else if ([41, 43, 45, 47, 48, 50].includes(pitch))
-        tom.triggerAttackRelease(freq(pitch - 12), "16n", time, vel);
-      else {
-        const long = [46, 49, 51, 52, 55, 57, 59].includes(pitch);
-        hat.triggerAttackRelease(long ? "8n" : "32n", time, vel * 0.8);
-      }
-    },
-    dispose: () => parts.forEach((p) => p.dispose()),
-  };
-}
-
-/** @param {string} role */
-function makeMelodic(role) {
-  const out = new Tone.Volume(-10).toDestination();
-  let synth;
-  if (role === "bass") {
-    synth = new Tone.MonoSynth({
-      oscillator: { type: "sawtooth" },
-      filter: { Q: 2, type: "lowpass" },
-      filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.3, baseFrequency: 120, octaves: 2.5 },
-      envelope: { attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.1 },
-    });
-  } else if (role === "lead") {
-    synth = new Tone.MonoSynth({
-      oscillator: { type: "square" },
-      envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.2 },
-      filterEnvelope: { baseFrequency: 600, octaves: 3 },
-    });
-  } else if (role === "pad") {
-    synth = new Tone.PolySynth(Tone.AMSynth, {
-      envelope: { attack: 0.4, decay: 0.3, sustain: 0.7, release: 1.2 },
-    });
-  } else {
-    synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "triangle" },
-      envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.6 },
-    });
-  }
-  synth.connect(out);
-  return {
-    /** @param {number} pitch @param {number} dur @param {number} time @param {number} vel */
-    trigger(pitch, dur, time, vel) {
-      synth.triggerAttackRelease(freq(pitch), dur, time, vel);
-    },
-    dispose: () => {
-      synth.dispose();
-      out.dispose();
-    },
-  };
-}
-
-/** @param {Track} track */
-function instrumentFor(track) {
-  const existing = instruments.get(track.id);
-  if (existing && existing.role === track.role) return existing;
-  existing?.dispose();
-  const made = track.role === "drums" ? makeDrums() : makeMelodic(track.role);
-  const entry = { role: track.role, ...made };
-  instruments.set(track.id, entry);
-  return entry;
-}
-
-/** Tracks that should sound: solo wins over mute. @param {Track[]} tracks */
-export function audibleTracks(tracks) {
-  const soloed = tracks.filter((t) => t.solo);
-  return soloed.length ? soloed : tracks.filter((t) => !t.mute);
-}
-
-/**
- * Schedule a list of section instances (by index into project.arrangement) and start.
- * @param {Project} project
- * @param {Record<number, Clip>} clips
- * @param {number[]} instanceIndexes
- * @param {{loop: boolean}} options
- * @returns {Promise<number>} total length in seconds (0 = nothing to play)
- */
-export async function play(project, clips, instanceIndexes, options) {
-  await Tone.start();
-  stop();
-  const transport = Tone.getTransport();
-  transport.bpm.value = project.bpm;
-  const bar = barTicks(project.ts_numerator, project.ts_denominator);
-  const sections = new Map(project.sections.map((s) => [s.id, s]));
-  const tracks = audibleTracks(project.tracks);
-
-  let offset = 0;
-  let scheduled = 0;
-  for (const index of instanceIndexes) {
-    const section = sections.get(project.arrangement[index]);
-    if (!section) continue;
-    const length = section.bars * bar;
-    for (const track of tracks) {
-      const clip = clips[section.slots[String(track.id)]];
-      const notes = clip?.current_version?.notes ?? [];
-      if (!notes.length) continue;
-      const instrument = instrumentFor(track);
-      for (const note of notes) {
-        if (note.t >= length) continue;
-        const start = ticksToSeconds(offset + note.t, project.bpm);
-        const dur = ticksToSeconds(Math.min(note.d, length - note.t), project.bpm);
-        const vel = note.v / 127;
-        transport.schedule((/** @type {number} */ time) => {
-          instrument.trigger(note.p, dur, time, vel);
-        }, start);
-        scheduled += 1;
-      }
-    }
-    offset += length;
-  }
-  const total = ticksToSeconds(offset, project.bpm);
-  if (!scheduled) return 0;
-  transport.loop = options.loop;
-  transport.loopStart = 0;
-  transport.loopEnd = total;
-  if (!options.loop) transport.scheduleOnce(() => stop(), total + 0.05);
-  transport.start("+0.05", 0);
-  return total;
-}
-
+/** @type {AudioContext | null} */
+let ctx = null;
+/** @type {any} */
+let synth = null;
+/** @type {any} */
+let sequencer = null;
+/** @type {string | null} */
+let loadedBank = null;
+let playing = false;
 /** @type {() => void} */
 let onStopped = () => {};
 
@@ -166,21 +26,115 @@ export function onStop(fn) {
   onStopped = fn;
 }
 
-export function stop() {
-  const transport = Tone.getTransport();
-  const wasPlaying = transport.state === "started";
-  transport.stop();
-  transport.cancel(0);
-  transport.loop = false;
-  if (wasPlaying) onStopped();
+/**
+ * MIDI channel of each track, mirroring app/midi_io.py `_channels`: drums on channel 10
+ * (index 9), melodic tracks take the other channels in track order.
+ * @param {Track[]} tracks  in position order
+ * @returns {Map<number, number>} track id -> channel
+ */
+export function channelMap(tracks) {
+  const melodic = Array.from({ length: 16 }, (_, c) => c).filter((c) => c !== DRUM_CHANNEL);
+  const out = new Map();
+  let next = 0;
+  for (const track of tracks) {
+    if (track.role === "drums") out.set(track.id, DRUM_CHANNEL);
+    else out.set(track.id, melodic[next++ % melodic.length]);
+  }
+  return out;
 }
 
-/** Current transport position in seconds (0 when stopped). */
+/** Tracks that should sound: solo wins over mute. @param {Track[]} tracks */
+export function audibleTracks(tracks) {
+  const soloed = tracks.filter((t) => t.solo);
+  return soloed.length ? soloed : tracks.filter((t) => !t.mute);
+}
+
+async function ensureSynth() {
+  if (!ctx) {
+    const { WorkletSynthesizer, Sequencer } = await import("spessasynth_lib");
+    ctx = new AudioContext();
+    await ctx.audioWorklet.addModule(PROCESSOR_URL);
+    synth = new WorkletSynthesizer(ctx);
+    synth.connect(ctx.destination);
+    sequencer = new Sequencer(synth, { skipToFirstNoteOn: false, initialPlaybackRate: 1 });
+    sequencer.eventHandler.addEvent("songEnded", "onyrix", () => {
+      if (sequencer.loopCount === 0) markStopped();
+    });
+  }
+  await ctx.resume();
+}
+
+/** @param {string} bankId */
+async function ensureBank(bankId) {
+  if (loadedBank === bankId) return;
+  const response = await fetch(`/api/soundfonts/${encodeURIComponent(bankId)}/file`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const buffer = await response.arrayBuffer();
+  await synth.soundBankManager.addSoundBank(buffer, "main");
+  await synth.isReady;
+  loadedBank = bankId;
+}
+
+function markStopped() {
+  if (!playing) return;
+  playing = false;
+  onStopped();
+}
+
+/** Apply mute/solo to the synth's channels (safe to call while playing). @param {Track[]} tracks */
+export function applyMutes(tracks) {
+  if (!synth) return;
+  const channels = channelMap(tracks);
+  const audible = new Set(audibleTracks(tracks).map((t) => t.id));
+  for (const [trackId, channel] of channels) {
+    synth.midiChannels[channel]?.setSystemParameter("isMuted", !audible.has(trackId));
+  }
+}
+
+/**
+ * Play arrangement instances [first, last] of `project` with the given bank.
+ * @param {Project} project
+ * @param {number[]} instanceIndexes  contiguous indexes into project.arrangement
+ * @param {{loop: boolean, bankId: string}} options
+ * @returns {Promise<void>}
+ */
+export async function play(project, instanceIndexes, options) {
+  await ensureSynth();
+  await ensureBank(options.bankId);
+  stop();
+  const start = Math.min(...instanceIndexes);
+  const end = Math.max(...instanceIndexes) + 1;
+  const response = await fetch(
+    `/api/export/project/${project.id}.mid?start=${start}&end=${end}&loop=true`,
+  );
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const binary = await response.arrayBuffer();
+  sequencer.loopCount = options.loop ? Infinity : 0;
+  sequencer.loadNewSongList([{ binary, fileName: `${project.name}.mid` }]);
+  applyMutes([...project.tracks].sort((a, b) => a.position - b.position));
+  sequencer.currentTime = 0;
+  sequencer.play();
+  playing = true;
+}
+
+export function stop() {
+  if (sequencer) {
+    sequencer.pause();
+    synth.stopAll(true);
+  }
+  markStopped();
+}
+
+/** Current position in seconds within the played range (0 when stopped). */
 export function positionSeconds() {
-  const transport = Tone.getTransport();
-  return transport.state === "started" ? transport.seconds : 0;
+  return playing && sequencer ? Math.max(0, sequencer.currentTime) : 0;
 }
 
 export function isPlaying() {
-  return Tone.getTransport().state === "started";
+  return playing;
+}
+
+/** Forget the loaded bank (e.g. after it was deleted or replaced). */
+export function resetBank() {
+  loadedBank = null;
 }

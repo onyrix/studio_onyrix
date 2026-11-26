@@ -3,6 +3,7 @@ import {
   addTrack,
   createProject,
   loadProjects,
+  loadSoundfonts,
   openProject,
   parseChords,
   showError,
@@ -13,6 +14,7 @@ import { h } from "./lib/dom.js";
 import { applyTranslations, noteName, t } from "./lib/i18n.js";
 import { getState, setState, subscribe } from "./lib/store.js";
 import { renderProjectBar } from "./components/project-bar.js";
+import { renderSounds } from "./components/sounds-dialog.js";
 import { renderArrangement } from "./views/arrangement.js";
 import { renderTransport } from "./views/transport.js";
 
@@ -72,13 +74,14 @@ const SUBMIT = {
 
 function wireDialogs() {
   document.querySelectorAll("dialog").forEach((dialog) => {
-    const form = /** @type {HTMLFormElement} */ (dialog.querySelector("form"));
-    const error = h("p.form-error", { role: "alert", hidden: true });
-    form.querySelector("footer")?.before(error);
-
     dialog.querySelectorAll("[data-close]").forEach((b) =>
       b.addEventListener("click", () => dialog.close()),
     );
+    const maybeForm = dialog.querySelector("form");
+    if (!maybeForm) return;
+    const form = /** @type {HTMLFormElement} */ (maybeForm);
+    const error = h("p.form-error", { role: "alert", hidden: true });
+    form.querySelector("footer")?.before(error);
     dialog.addEventListener("prepare", () => {
       form.reset();
       error.hidden = true;
@@ -114,6 +117,7 @@ function render() {
   renderProjectBar($("project-bar"), state);
   renderTransport($("transport"), state);
   renderArrangement($("arrangement"), state);
+  renderSounds($("sounds-body"), state);
   const message = $("message");
   message.textContent = state.message;
   message.hidden = !state.message;
@@ -141,7 +145,7 @@ async function init() {
   subscribe(render);
   render();
   await checkHealth();
-  await loadProjects();
+  await Promise.all([loadProjects(), loadSoundfonts()]);
   const first = getState().projects[0];
   if (first) await openProject(first.id);
   else {

@@ -8,6 +8,8 @@
  * @typedef {{id: number, name: string, bpm: number, ts_numerator: number, ts_denominator: number, key_tonic: number, key_mode: string, genre: string, chord_grid: Array<{root: number, quality: string}>, tracks: Track[], sections: Section[], arrangement: number[]}} Project
  * @typedef {{id: number, track_id: number, bars: number, locked: boolean, current_version: {notes: Note[], score: number|null, seed: number|null} | null}} Clip
  * @typedef {{jobId: string, status: string, detail: Record<string, any>}} JobState
+ * @typedef {{id: string, name: string, format: string, size: number, active: boolean}} Bank
+ * @typedef {{active: string | null, banks: Bank[], default: {id: string, name: string, licence: string, licence_url: string}, suggested: Array<{name: string, licence: string, licence_kind: string, url: string}>}} Soundfonts
  * @typedef {{
  *   projects: Array<{id: number, name: string}>,
  *   project: Project | null,
@@ -18,6 +20,8 @@
  *   playing: null | "section" | "all",
  *   playFromBar: number,
  *   zoom: number,
+ *   soundfonts: Soundfonts | null,
+ *   soundBusy: string,
  *   message: string,
  * }} State
  */
@@ -33,6 +37,8 @@ const state = {
   playing: null,
   playFromBar: 0,
   zoom: 56,
+  soundfonts: null,
+  soundBusy: "",
   message: "",
 };
 

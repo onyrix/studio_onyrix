@@ -5,7 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Studio Onyrix</title>
     <link rel="stylesheet" href="css/app.css" />
-    <script src="vendor/tone/Tone.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "spessasynth_lib": "/vendor/spessasynth/spessasynth_lib.js",
+          "spessasynth_core": "/vendor/spessasynth/spessasynth_core.js",
+          "fflate": "/vendor/spessasynth/fflate.js",
+          "stb-vorbis": "/vendor/spessasynth/stb-vorbis.js"
+        }
+      }
+    </script>
     <script type="module" src="js/main.js"></script>
   </head>
   <body>
@@ -83,6 +92,15 @@
           <button type="submit" class="primary" data-i18n="form.add"></button>
         </footer>
       </form>
+    </dialog>
+    <dialog id="dialog-sounds" class="wide">
+      <div class="form">
+        <h2 data-i18n="sound.title"></h2>
+        <div id="sounds-body"></div>
+        <footer>
+          <button type="button" data-close data-i18n="form.close"></button>
+        </footer>
+      </div>
     </dialog>
   </body>
 </html>

@@ -1,7 +1,8 @@
 // Actions: call the API, then mirror the server's answer into the store.
 
-import { api, followJob } from "./api.js";
+import { api, followJob, uploadSoundfont as uploadBank } from "./api.js";
 import { t } from "./i18n.js";
+import { resetBank } from "./player.js";
 import { getState, jobKey, setState } from "./store.js";
 
 /** @param {unknown} error */
@@ -109,4 +110,45 @@ export async function generate(sectionId, trackId) {
 export async function cancel(sectionId, trackId) {
   const job = getState().jobs[jobKey(sectionId, trackId)];
   if (job) await api.cancelJob(job.jobId);
+}
+
+// ---- Sound banks -------------------------------------------------------------------------
+
+export async function loadSoundfonts() {
+  setState({ soundfonts: await api.soundfonts() });
+}
+
+/** Run a bank operation with a busy label, then refresh the list. @param {string} label @param {() => Promise<unknown>} task */
+async function withSoundBusy(label, task) {
+  setState({ soundBusy: label });
+  try {
+    await task();
+    resetBank();
+    await loadSoundfonts();
+  } finally {
+    setState({ soundBusy: "" });
+  }
+}
+
+/** @param {File} file */
+export function importSoundfont(file) {
+  return withSoundBusy(t("sound.uploading", { percent: 0 }), () =>
+    uploadBank(file, (fraction) =>
+      setState({ soundBusy: t("sound.uploading", { percent: Math.round(fraction * 100) }) }),
+    ),
+  );
+}
+
+export function downloadDefaultSoundfont() {
+  return withSoundBusy(t("sound.downloading"), () => api.downloadDefaultSoundfont());
+}
+
+/** @param {string} id */
+export function setActiveSoundfont(id) {
+  return withSoundBusy(t("sound.switching"), () => api.setActiveSoundfont(id));
+}
+
+/** @param {string} id */
+export function deleteSoundfont(id) {
+  return withSoundBusy(t("sound.deleting"), () => api.deleteSoundfont(id));
 }

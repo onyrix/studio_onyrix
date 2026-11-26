@@ -31,17 +31,20 @@ DEFAULT_BANK = {
 SUGGESTED_BANKS = [
     {
         "name": "GeneralUser GS 2.0",
-        "licence": "GeneralUser GS License v2.0 (permissive)",
+        "licence": "GeneralUser GS License v2.0",
+        "licence_kind": "permissive",
         "url": "https://schristiancollins.com/generaluser.php",
     },
     {
         "name": "FluidR3_GM",
         "licence": "MIT",
+        "licence_kind": "permissive",
         "url": "https://musescore.org/en/handbook/soundfonts",
     },
     {
         "name": "Timbres of Heaven",
-        "licence": "Non-commercial use only; no redistribution",
+        "licence": "Timbres of Heaven licence",
+        "licence_kind": "non_commercial",
         "url": "http://midkar.com/soundfonts/",
     },
 ]

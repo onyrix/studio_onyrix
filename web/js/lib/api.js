@@ -52,6 +52,11 @@ export const api = {
     request("POST", `/projects/${projectId}/sections`, data),
   generate: (/** @type {object} */ data) => request("POST", "/generate", data),
   cancelJob: (/** @type {string} */ id) => request("POST", `/jobs/${id}/cancel`),
+  soundfonts: () => request("GET", "/soundfonts"),
+  setActiveSoundfont: (/** @type {string} */ id) => request("PUT", "/soundfonts/active", { id }),
+  deleteSoundfont: (/** @type {string} */ id) =>
+    request("DELETE", `/soundfonts/${encodeURIComponent(id)}`),
+  downloadDefaultSoundfont: () => request("POST", "/soundfonts/default"),
 };
 
 export const TERMINAL_EVENTS = ["done", "error", "cancelled"];
@@ -79,4 +84,34 @@ export function followJob(jobId, onEvent) {
     onEvent("error", { message: "connection lost" });
   };
   return () => source.close();
+}
+
+/**
+ * Upload a sound bank as the raw request body, reporting progress (fetch has no upload progress).
+ * @param {File} file
+ * @param {(fraction: number) => void} onProgress
+ * @returns {Promise<any>}
+ */
+export function uploadSoundfont(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/soundfonts?filename=${encodeURIComponent(file.name)}`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      const body = (() => {
+        try {
+          return JSON.parse(xhr.responseText);
+        } catch {
+          return null;
+        }
+      })();
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+      else reject(new ApiError(xhr.status, detailMessage(body) || `HTTP ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new ApiError(0, "network error"));
+    xhr.send(file);
+  });
 }
