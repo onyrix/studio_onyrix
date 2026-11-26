@@ -84,6 +84,12 @@ export async function addSection(data) {
   await refreshProject();
 }
 
+/** @param {number} sectionId @param {object} data */
+export async function patchSection(sectionId, data) {
+  await api.patchSection(sectionId, data);
+  await refreshProject();
+}
+
 /** @param {string} key @param {Partial<import("./store.js").JobState>} patch */
 function updateJob(key, patch) {
   const jobs = { ...getState().jobs };

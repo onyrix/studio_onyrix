@@ -3,18 +3,52 @@
 // each block on a track row is that track's part (clip) in that section instance.
 
 import { cancel, generate, patchTrack, showError } from "../lib/actions.js";
+import { openChordDialog } from "../components/chord-dialog.js";
 import { drawClip } from "../components/clip-preview.js";
 import { h } from "../lib/dom.js";
-import { noteName, t } from "../lib/i18n.js";
+import { t } from "../lib/i18n.js";
 import { jobKey, setState } from "../lib/store.js";
 import { barTicks } from "../lib/timebase.js";
 
 const ACTIVE = new Set(["queued", "started", "sampling", "candidate"]);
 export const ZOOM_LEVELS = [24, 36, 56, 80, 120];
 
-/** @param {Array<{root: number, quality: string}>} grid */
+/** @param {Array<{symbol: string}>} grid */
 function chordText(grid) {
-  return grid.map((c) => noteName(c.root) + c.quality).join(" ");
+  return grid.map((c) => c.symbol).join(" ");
+}
+
+/**
+ * Chord lane block for one section instance: one button per bar, the section's own grid or
+ * (faded) the project's progression cycled over the section, as the generator does.
+ * @param {import("../lib/store.js").Section} section
+ * @param {import("../lib/store.js").Chord[]} projectGrid
+ * @param {boolean} selected
+ * @param {number} zoom  px per bar
+ */
+function chordBlock(section, projectGrid, selected, zoom) {
+  const inherited = !section.chord_grid.length;
+  const grid = inherited ? projectGrid : section.chord_grid;
+  const block = h(
+    `div.tl-chord-block${inherited ? ".inherited" : ""}${selected ? ".selected" : ""}`,
+  );
+  for (let bar = 0; bar < section.bars; bar++) {
+    const symbol = grid.length ? grid[bar % grid.length].symbol : "";
+    const repeated = bar > 0 && grid.length > 0 && grid[(bar - 1) % grid.length].symbol === symbol;
+    block.append(
+      h(
+        "button.tl-chord",
+        {
+          type: "button",
+          title: t("chords.edit", { section: section.name, bar: bar + 1 }),
+          onclick: () => openChordDialog(section.id, bar).catch(showError),
+        },
+        repeated ? "%" : symbol || "–",
+      ),
+    );
+  }
+  block.style.width = `${section.bars * zoom}px`;
+  return block;
 }
 
 /** @param {import("../lib/store.js").JobState | undefined} job */
@@ -135,6 +169,15 @@ export function renderArrangement(root, state) {
     firstBar += section.bars;
   }
   grid.append(h("div.tl-corner", null, t("arrangement.tracks")), ruler);
+
+  // Chord lane: one chord per bar, click to edit the section's grid.
+  const chordLane = h("div.tl-chords", { role: "row" });
+  for (const { index, section } of instances) {
+    if (section) {
+      chordLane.append(chordBlock(section, project.chord_grid, index === state.selected, zoom));
+    }
+  }
+  grid.append(h("div.tl-corner.tl-chords-head", null, t("chords.lane")), chordLane);
 
   // One row per track: a part (clip) block per section instance.
   /** @type {Array<() => void>} */

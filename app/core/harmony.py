@@ -143,8 +143,14 @@ def pc_name(pc: int, flats: bool = False) -> str:
 
 
 def chord_symbol(slot: ChordSlot, key: Key | None = None) -> str:
-    """Inverse of `parse_chord`: `Am7`, `Bbmaj7`, `C/E` (one extra pitch class = slash bass)."""
+    """Inverse of `parse_chord`: `Am7`, `Bbmaj7`, `C/E` (one extra pitch class = slash bass).
+
+    Spelling follows the key signature; an out-of-key root follows its degree (bII in A minor is
+    Bb, not A#).
+    """
     flats = prefers_flats(key)
+    if key is not None and slot.root not in scale_pitch_classes(key):
+        flats = roman_numeral(slot, key).startswith("b")
     text = pc_name(slot.root, flats) + slot.quality
     base = {(slot.root + i) % 12 for i in QUALITIES.get(slot.quality, ())}
     extra = sorted(slot.pitch_class_set - base)

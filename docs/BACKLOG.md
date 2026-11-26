@@ -15,8 +15,8 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | M1 | Model spike | ✅ | `scripts/m1_spike.py`, findings in `docs/midigpt-notes.md`. |
 | M2 | Adapter, engine, candidates, scorer, post-processing, `/generate` + SSE | ✅ | 4 candidates, best by S, same seed ⇒ same notes, with the real model too. |
 | M3 | Vanilla frontend: arrangement timeline, transport, playback, export | ✅ | Playback confirmed audible by the user (2026-11-26). Tone.js timbres judged poor → replaced by SpessaSynth + SoundFont banks (B-01…B-04). |
-| C1 | Harmony: chord lane, diatonic chords, suggestions (rule-based planner) | 🟡 | Next. Items B-60…B-64. Order decided 2026-11-26: C1 → C2 → C3 → C4 → M4 → M5. |
-| C2 | Harmony adherence + benchmark | ⬜ | Items B-20, B-70…B-74. |
+| C1 | Harmony: chord lane, diatonic chords, suggestions (rule-based planner) | ✅ | Chord lane + chord dialog checked in headless Chrome (2026-11-26). Order decided 2026-11-26: C1 → C2 → C3 → C4 → M4 → M5. |
+| C2 | Harmony adherence + benchmark | 🟡 | Items B-20, B-70…B-74. |
 | C3 | Prompt per part ("Regenerate with note") | ⬜ | Items B-16, B-80…B-84. |
 | C4 | Song from prompt + "Generate all" | ⬜ | Items B-21, B-22, B-41, B-90…B-94. |
 | M4 | Clip editor, replace / vary / lock / history, section reorder + repeat / duplicate | ⬜ | After C4. Items B-10…B-19. |
@@ -83,8 +83,8 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | B-60 | `core/harmony`: `chord_symbol` (inverse of `parse_chord`), `diatonic_chords`, `roman_numeral`, `suggest_next` (functional, secondary dominant, modal borrowing, tritone sub, relative) | ✅ |
 | B-61 | `RuleBasedPlanner.suggest_progressions` per mode × genre × section kind, length variants, cadences | ✅ |
 | B-62 | `/harmony/diatonic`, `/harmony/suggest`, `/harmony/next` | ✅ |
-| B-63 | Chord lane in the timeline: per-section grid editing with server validation | ⬜ |
-| B-64 | Suggestion popovers: progression for the selected section, chord change on a bar | ⬜ |
+| B-63 | Chord lane in the timeline: per-section grid editing with server validation | ✅ |
+| B-64 | Suggestion popovers: progression for the selected section, chord change on a bar | ✅ |
 | B-70 | Spike: what do prism's 13 `pitch_class_set` levels encode? Use per bar if possible | ⬜ |
 | B-71 | `postprocess.harmonic_snap` (role-aware, idempotent, property-tested) | ⬜ |
 | B-72 | Strict harmony mode: block generation aligned to chord changes, per-block `pitch_mask` | ⬜ |

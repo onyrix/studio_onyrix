@@ -39,8 +39,8 @@ function fillOptions() {
   });
 }
 
-/** @param {Array<{root: number, quality: string}>} grid */
-const chordsToText = (grid) => grid.map((c) => noteName(c.root) + c.quality).join(" ");
+/** @param {Array<{symbol: string}>} grid */
+const chordsToText = (grid) => grid.map((c) => c.symbol).join(" ");
 
 /** @param {HTMLFormElement} form */
 function formValues(form) {

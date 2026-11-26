@@ -50,6 +50,12 @@ export const api = {
     request("PATCH", `/tracks/${id}`, data),
   addSection: (/** @type {number} */ projectId, /** @type {object} */ data) =>
     request("POST", `/projects/${projectId}/sections`, data),
+  patchSection: (/** @type {number} */ id, /** @type {object} */ data) =>
+    request("PATCH", `/sections/${id}`, data),
+  harmonyDiatonic: (/** @type {number} */ tonic, /** @type {string} */ mode) =>
+    request("GET", `/harmony/diatonic?tonic=${tonic}&mode=${encodeURIComponent(mode)}`),
+  harmonySuggest: (/** @type {object} */ data) => request("POST", "/harmony/suggest", data),
+  harmonyNext: (/** @type {object} */ data) => request("POST", "/harmony/next", data),
   generate: (/** @type {object} */ data) => request("POST", "/generate", data),
   cancelJob: (/** @type {string} */ id) => request("POST", `/jobs/${id}/cancel`),
   soundfonts: () => request("GET", "/soundfonts"),

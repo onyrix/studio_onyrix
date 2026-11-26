@@ -219,6 +219,7 @@ input {
   position: relative;
   display: grid;
   grid-template-columns: var(--head) var(--lanes-width);
+  grid-template-rows: var(--row) 34px; /* ruler, chord lane; then one row per track */
   grid-auto-rows: var(--row);
   width: max-content;
   min-width: 100%;
@@ -355,6 +356,52 @@ input {
   color: var(--muted);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+}
+
+/* Chord lane: one chord per bar */
+.tl-chords {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.tl-chords-head {
+  align-items: center;
+}
+
+.tl-chord-block {
+  display: flex;
+  flex: none;
+  border-right: 2px solid var(--border);
+}
+
+.tl-chord-block.selected {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.tl-chord {
+  flex: 0 0 var(--zoom);
+  min-width: 0;
+  justify-content: flex-start;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tl-chord:hover {
+  background: var(--accent-soft);
+}
+
+.tl-chord-block.inherited .tl-chord {
+  color: var(--muted);
+  font-weight: 500;
+  font-style: italic;
 }
 
 /* Track lanes and parts */
@@ -606,4 +653,63 @@ dialog.wide {
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Chord dialog */
+.chord-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 4px;
+}
+
+.chord-bar {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 4px 6px;
+}
+
+.chord-bar.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.chord-bar.inherited span {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip,
+.progression {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 4px 8px;
+}
+
+.chip small,
+.progression small,
+.chord-bar small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.progressions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progression {
+  width: 100%;
 }

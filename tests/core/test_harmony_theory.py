@@ -40,6 +40,13 @@ def test_chord_symbol_spells_by_key() -> None:
     assert chord_symbol(make_chord(3, "m"), Key(0, Mode.MINOR)) == "Ebm"
 
 
+def test_out_of_key_roots_are_spelled_by_degree() -> None:
+    a_minor, c_major = Key(9, Mode.MINOR), Key(0, Mode.MAJOR)
+    assert chord_symbol(make_chord(10, ""), a_minor) == "Bb"  # bII, neapolitan
+    assert chord_symbol(make_chord(10, ""), c_major) == "Bb"  # bVII
+    assert chord_symbol(make_chord(8, "dim"), a_minor) == "G#dim"  # #vii°
+
+
 def test_diatonic_triads() -> None:
     names = [chord_symbol(c) for c in diatonic_chords(Key(0, Mode.MAJOR))]
     assert names == ["C", "Dm", "Em", "F", "G", "Am", "Bdim"]

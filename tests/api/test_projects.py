@@ -7,7 +7,12 @@ def test_project_crud_and_chord_grid(client: TestClient) -> None:
     created = client.post("/api/projects", json={"name": "Song", "chord_grid": ["Am7", "D"]})
     assert created.status_code == 201
     body = created.json()
-    assert body["chord_grid"][0] == {"root": 9, "quality": "m7", "pitch_class_set": [0, 4, 7, 9]}
+    assert body["chord_grid"][0] == {
+        "root": 9,
+        "quality": "m7",
+        "pitch_class_set": [0, 4, 7, 9],
+        "symbol": "Am7",
+    }
     pid = body["id"]
 
     patched = client.patch(f"/api/projects/{pid}", json={"bpm": 90, "genre": "jazz"}).json()

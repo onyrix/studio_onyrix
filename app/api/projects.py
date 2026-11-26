@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,10 +22,18 @@ from app.api.schemas import (
     TrackOut,
     TrackPatch,
 )
+from app.core.harmony import chord_slot_from_dict, chord_symbol
+from app.core.model import Key, Mode
 from app.core.roles import role_spec
 from app.db.models import ArrangementItem, Project, Section, Track
 
 router = APIRouter(tags=["projects"])
+
+
+def grid_out(grid: list[dict[str, Any]], project: Project) -> list[dict[str, Any]]:
+    """Stored chord dicts plus a display `symbol` spelled for the project key (C/E, Bb...)."""
+    key = Key(project.key_tonic, Mode(project.key_mode))
+    return [{**c, "symbol": chord_symbol(chord_slot_from_dict(c), key)} for c in grid]
 
 
 def section_out(section: Section) -> SectionOut:
@@ -31,7 +41,7 @@ def section_out(section: Section) -> SectionOut:
         id=section.id,
         name=section.name,
         bars=section.bars,
-        chord_grid=section.chord_grid,
+        chord_grid=grid_out(section.chord_grid, section.project),
         slots={slot.track_id: slot.clip_id for slot in section.slots},
     )
 
@@ -46,7 +56,7 @@ def project_out(project: Project) -> ProjectOut:
         key_tonic=project.key_tonic,
         key_mode=project.key_mode,  # type: ignore[arg-type]
         genre=project.genre,
-        chord_grid=project.chord_grid,
+        chord_grid=grid_out(project.chord_grid, project),
         tracks=[TrackOut.model_validate(t) for t in project.tracks],
         sections=[section_out(s) for s in project.sections],
         arrangement=[item.section_id for item in project.arrangement],
