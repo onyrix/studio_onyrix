@@ -130,6 +130,7 @@ class SectionSlot(Base):
     clip_id: Mapped[int] = mapped_column(ForeignKey("clips.id", ondelete="CASCADE"))
 
     section: Mapped[Section] = relationship(back_populates="slots")
+    clip: Mapped[Clip] = relationship()
 
 
 class ArrangementItem(Base):

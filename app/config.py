@@ -20,6 +20,7 @@ class Settings:
     database_url: str = f"sqlite:///{(ROOT_DIR / 'onyrix.db').as_posix()}"
     model_name: str = "prism_medium"
     fallback_model_name: str = "yellow_medium"
+    device: str = "auto"  # auto | cpu | cuda | mps
     n_candidates: int = 4
     host: str = "127.0.0.1"
     port: int = 8000
@@ -38,6 +39,7 @@ class Settings:
             database_url=_env("DATABASE_URL", defaults.database_url),
             model_name=_env("MODEL", defaults.model_name),
             fallback_model_name=_env("FALLBACK_MODEL", defaults.fallback_model_name),
+            device=_env("DEVICE", defaults.device),
             n_candidates=int(_env("N_CANDIDATES", str(defaults.n_candidates))),
             host=_env("HOST", defaults.host),
             port=int(_env("PORT", str(defaults.port))),

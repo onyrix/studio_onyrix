@@ -5,22 +5,47 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import health
+from app.api import clips, generate, health, projects
 from app.config import WEB_DIR, Settings
+from app.db.base import Base
+from app.db.session import MEMORY_URLS, make_engine, make_session_factory
+from app.gen.engine import Engine, MidiGptEngine
+from app.gen.jobs import JobManager
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
+    """Build the app. `engine` defaults to midigpt, loaded lazily on first generation."""
     settings = settings or Settings.from_env()
-    app = FastAPI(title="Studio Onyrix", version=__version__)
+    db_engine = make_engine(settings.database_url)
+    if settings.database_url in MEMORY_URLS:
+        Base.metadata.create_all(db_engine)  # tests / throwaway runs; files use Alembic
+    jobs = JobManager()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        jobs.shutdown()
+        db_engine.dispose()
+
+    app = FastAPI(title="Studio Onyrix", version=__version__, lifespan=lifespan)
     app.state.settings = settings
+    app.state.session_factory = make_session_factory(db_engine)
+    app.state.engine = engine or MidiGptEngine(
+        settings.model_name, settings.fallback_model_name, device=settings.device
+    )
+    app.state.jobs = jobs
+    app.state.candidates = {}
 
     api = APIRouter(prefix="/api")
-    api.include_router(health.router)
+    for module in (health, projects, clips, generate):
+        api.include_router(module.router)
     app.include_router(api)
 
     # Mounted last so /api routes take precedence. Static files are served as-is (no build).

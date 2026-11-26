@@ -145,7 +145,7 @@ Default order inside a section: **drums → bass → chords/pad → lead**. Ever
 - Decoded scores come back at resolution 1920 regardless of input: always `resample(480)` before use. `config.model_dim` must be a value from the model's `num_bars_map`.
 - **Do not hard-code attribute names or value ranges.** Read them at runtime (`GET /info` on the HTTP server, or `engine._analyzer.attribute_sizes()` / `attribute_value_labels()` in-process) and cache them. Map project concepts (density level, chord pitch classes) to the quantized levels the model reports.
 - Score conversion (project → midigpt `Score`): resolution 480, tempo in µs per quarter, per-bar time signature, GM `instrument`, `track_type` `melodic` or `drum`.
-- Infill uses `TrackPrompt(id, bars=[...])`; from-scratch uses `autoregressive=True`; `ignore=True` omits a track from context; per-bar overrides go in `bar_attributes` / `bar_controls`. Default `InferenceConfig(mask_mode="attention", temperature=1.0, top_p=0.95)`.
+- Infill uses `TrackPrompt(id, bars=[...])`; from-scratch uses `autoregressive=True`; `ignore=True` omits a track from context; per-bar attribute overrides go in `bar_attributes`. `bar_controls` honours only `time_signature` (a per-bar `pitch_mask` is silently ignored): put `pitch_mask` in the track-level `controls` (key scale + role range). Default `InferenceConfig(mask_mode="attention", temperature=1.0, top_p=0.95)`.
 - Sections longer than the largest window are generated in windows with 2 bars of overlap; overlapped bars are taken from the earlier window.
 - **Spike first (Milestone M1):** inspect the installed `midigpt` classes (`Score`, `Track`, `Bar`, note type) and the attribute list to confirm exact field names before writing the adapter. Do not guess.
 
@@ -233,7 +233,7 @@ Rules:
 ## 9. Testing
 
 - `tests/core`: unit + property tests (Hypothesis) for `timebase`, `postprocess` (idempotence, range, no overlaps), `scorer`, `drums`, `harmony`. Golden-file tests for `.mid` export (tempo map, PPQ 480, track names, GM programs).
-- `tests/api`: FastAPI TestClient, in-memory SQLite, a `FakeEngine` that returns deterministic notes. Cover replace / reorder / duplicate-section semantics and version restore.
+- `tests/api`: FastAPI TestClient, a temporary SQLite file per test (not in-memory: the generation worker writes from its own thread, and an in-memory database shares one connection and transaction across threads), a `FakeEngine` that returns deterministic notes. Cover replace / reorder / duplicate-section semantics and version restore.
 - `tests/inference` (`-m inference`): smoke test per model — generate 4 bars for each role, assert post-processed output is valid and in range. Never assert exact notes.
 - Frontend: no JS test runner. Keep frontend logic thin; tick/second conversions mirror `core/timebase.py`, which is the tested reference.
 - Bug fixes ship with a regression test.
