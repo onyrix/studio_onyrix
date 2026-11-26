@@ -175,15 +175,30 @@ def build_request(spec: GenerationSpec, target_index: int, caps: ModelCaps) -> A
             attributes["key_signature"] = key_signature_index(spec.key)
         if spec.target_spec.monophonic:
             set_attr(("bar_max_polyphony", "max_polyphony"), 0)  # level 0 = "1 voice"
+        # `pitch_class_set` is the COUNT of distinct pitch classes in a bar (B-70), not which
+        # ones: for chord parts, ask for as many pitch classes as the bar's chord has.
+        if spec.target_role in (Role.CHORDS, Role.PAD) and caps.has(
+            "pitch_class_set", "bar", track_type
+        ):
+            size = caps.attribute_sizes["pitch_class_set"]
+            for b in bars:
+                chord = spec.chords[b % len(spec.chords)] if spec.chords else None
+                if chord is not None:
+                    level = _level(len(chord.pitch_class_set), size)
+                    bar_attributes.setdefault(b, {})["pitch_class_set"] = level
         track_controls["pitch_mask"] = pitch_mask(spec)
     elif spec.density is not None:
         set_attr(("bar_note_density", "note_density"), spec.density)
 
     prompts = [TrackPrompt(id=i, bars=[]) for i in range(target_index)]
+    # The target track is always empty (built by `build_score`), so it is generated from scratch:
+    # `autoregressive=True`. Infill on an empty track degenerates into one repeated pitch class
+    # per bar (B-70 finding, docs/midigpt-notes.md).
     prompts.append(
         TrackPrompt(
             id=target_index,
             bars=bars,
+            autoregressive=True,
             attributes=attributes,
             bar_attributes=bar_attributes,
             controls=track_controls,

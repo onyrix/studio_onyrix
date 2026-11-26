@@ -98,6 +98,21 @@ Score.from_midi(path) / from_bytes(data) / to_midi(path) / resample(tpq) / to_di
 - **`bar_controls` only honours `time_signature`.** A `pitch_mask` inside `bar_controls` passes `validate_request` but is silently ignored by `SamplingSession` (it reads only `time_signature` there). `pitch_mask` works **only** in track-level `TrackPrompt.controls`, one mask per step. Per-bar *attributes* (`bar_attributes`, e.g. `bar_max_polyphony`) are honoured. The adapter therefore sends one track-level mask: key scale (or union of chord tones when there is no key) + role range as a `uniform` shape. Regression tests: `tests/gen/test_adapter.py::test_pitch_mask_is_track_level_not_bar_level`, `tests/inference/test_pipeline.py::test_raw_output_respects_pitch_mask`.
 - **Chord following is weak.** With the mask applied, raw bass stays in scale and in range on both models, but on Am–F–C–G the best candidates are pedal tones on A (prism) or busy single-note lines (yellow): CT ≈ 0.5. Candidates for improvement later: more candidates (N=8), stronger chord context, generating bar by bar with per-bar masks (costs latency), or a higher CT weight for bass. Not addressed in M2.
 
+## C2 findings (B-70, 2026-11-26)
+
+- **`pitch_class_set` (prism, bar level, 13 levels) is a COUNT**, not a set: `len({pitch % 12})` of the bar's notes, quantized to 0–12 (`midigpt/attributes/pitch_class_set.py`). It cannot carry chord identity. The adapter sets it per bar for chords/pad to the size of that bar's chord; on its own it did not change the output measurably.
+- **The target track must be generated with `autoregressive=True`.** The adapter used infill (`autoregressive=False`) on the always-empty target track. Prism then produced one repeated pitch class per bar for chords and pad (raw: 1 pitch class, 1 voice in every bar, every candidate, with or without `pitch_mask`, attributes or `bar_min_polyphony`). With `autoregressive=True`: 3–5 pitch classes per bar, up to 4–6 voices. Regression test: `tests/gen/test_adapter.py::test_target_track_is_generated_from_scratch`.
+- Bass on Am–F–C–G, A minor, 6 requests × 4 candidates, CT measured on post-processed notes **before** the harmonic snap:
+
+  | Model | Mode | Mean CT (all) | Mean CT (best) | Latency / request (CPU) |
+  |---|---|---|---|---|
+  | prism | infill | 0.48 | 0.54 | 15.9 s |
+  | prism | autoregressive | 0.47 | **0.70** | **8.2 s** |
+  | yellow | infill | 0.44 | 0.60 | 27.1 s |
+  | yellow | autoregressive | 0.41 | 0.54 | **10.8 s** |
+
+  After `harmonic_snap` (level `normal`) every beat of the kept bass is a chord tone by construction; the scorer still ranks on the pre-snap notes.
+
 ## Implications for M2
 
 - **Resolution:** decoded scores come back at **resolution 1920**, whatever the input resolution was. The adapter must call `score.resample(480)` on every result before converting to clip notes (`scripts/m1_spike.py` does this).

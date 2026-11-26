@@ -147,3 +147,29 @@ def test_extract_notes_resamples_and_flattens() -> None:
         Note(0, 40, 40, 1),
         Note(1920 + 480, 43, 120, 90),
     )
+
+
+def test_chord_parts_ask_for_the_chord_size_in_pitch_classes() -> None:
+    caps = ModelCaps(
+        name="prism_medium",
+        num_bars_map=(4,),
+        attribute_sizes={"pitch_class_set": 13},
+        attribute_levels={"pitch_class_set": "bar"},
+        attribute_track_types={"pitch_class_set": "melodic"},
+    )
+    chords = (parse_chord("Am7"), parse_chord("F"), None, parse_chord("Cadd9"))
+    spec = bass_spec(target_role=Role.CHORDS, target_spec=role_spec(Role.CHORDS), chords=chords)
+    prompt = build_request(spec, 0, caps).tracks[0]
+    assert {b: a.get("pitch_class_set") for b, a in prompt.bar_attributes.items()} == {
+        0: 4,
+        1: 3,
+        3: 4,
+    }
+    bass = build_request(bass_spec(chords=chords), 0, caps).tracks[0]
+    assert all("pitch_class_set" not in a for a in bass.bar_attributes.values())
+
+
+def test_target_track_is_generated_from_scratch() -> None:
+    """Regression: infill on the empty target track gave one repeated pitch class per bar."""
+    request = build_request(bass_spec(), 0, PRISM)
+    assert request.tracks[-1].autoregressive is True
