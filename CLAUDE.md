@@ -274,6 +274,7 @@ Work milestone by milestone. Do not start M(n+1) before M(n) acceptance passes.
 ## 12. Working agreement for Claude Code
 
 - Start each session by reading this file and running `make test`.
+- The backlog (milestone status, work items, open decisions, known gaps) lives in `docs/BACKLOG.md`. Update it in the same commit that completes or changes an item.
 - Prefer small, reviewable commits with imperative-mood English messages.
 - When a requirement here is ambiguous or contradicted by what the code or libraries actually do, stop and report; do not silently diverge. If a decision changes, update this file in the same commit.
 - Keep `core/` pure (no I/O, no FastAPI, no torch imports) so it stays fast to test.
