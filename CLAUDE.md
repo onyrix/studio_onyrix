@@ -12,7 +12,7 @@ Use: **personal, non-commercial**. Single user, no accounts.
 2. **Python `>=3.10,<3.13`.** The `midigpt` wheels cover CPython 3.10–3.12 only. Do not raise the upper bound.
 3. **Bind to `127.0.0.1` by default.** There is no authentication. LAN exposure only with an explicit `--host 0.0.0.0` flag, which must print a warning.
 4. **Never download model weights in tests or at import time.** Weights are fetched on first real generation (Hugging Face cache) or by an explicit `make fetch-models`. Tests that need a model are marked `@pytest.mark.inference` and are skipped by default.
-5. **Never commit weights, generated `.mid` files, SQLite databases, or `node_modules`.**
+5. **Never commit weights, sound banks (`.sf2/.sf3/.dls`, kept in the git-ignored `data/`), generated `.mid` files, SQLite databases, or `node_modules`.**
 6. **Do not add a dependency without asking.** Propose it with a one-line justification first.
 7. **Generation must be reproducible.** Every generation takes a `seed`; the seed is stored with the clip version.
 8. **The deterministic post-processor is the source of truth for musical validity.** The model proposes; `postprocess` and `scorer` decide. Never trust raw model output.
@@ -30,7 +30,7 @@ Use: **personal, non-commercial**. Single user, no accounts.
 | MIDI I/O | `mido` for `.mid` read/write (add `pretty_midi` only if needed) |
 | Storage | SQLite via SQLAlchemy 2.x + Alembic migrations |
 | Frontend | Vanilla HTML + CSS + JavaScript (native ES modules, JSDoc type annotations). **No Node.js, no bundler, no build step** |
-| Audio playback | Tone.js transport + a JS SoundFont (SF2) synth for General MIDI, both vendored as prebuilt files in `web/vendor/` (no CDN) |
+| Audio playback | SpessaSynth (`spessasynth_lib` + `spessasynth_core`, Apache-2.0): AudioWorklet SF2/SF3/DLS synth with a built-in MIDI sequencer, vendored as prebuilt ES modules in `web/vendor/spessasynth/` (no CDN), resolved by a native import map. Default bank MuseScore General (MIT), downloaded on demand; users import any other bank. See `docs/audio-playback.md` |
 | Python tooling | `pip` + `.venv` (`uv` optional), `ruff`, `mypy --strict` on `app/`, `pytest` |
 | JS tooling | None. Frontend logic that needs tests is mirrored/validated on the Python side |
 | CI (later) | GitHub Actions matrix: ubuntu / macos / windows |
@@ -66,7 +66,8 @@ The vanilla, build-free frontend is the default decision; introducing Node.js, a
 │   │   ├── jobs.py          # single-worker job queue (serialized, cancellable)
 │   │   └── planner.py       # optional LLM planner (chord grid, sections) — behind an interface
 │   ├── db/                  # SQLAlchemy models, repositories, migrations
-│   └── midi_io.py           # export / import .mid
+│   ├── midi_io.py           # export / import .mid
+│   └── soundfonts.py        # sound bank storage (data/soundfonts, git-ignored), default download
 ├── web/                     # static files served as-is by FastAPI (no build)
 │   ├── index.html
 │   ├── css/
@@ -75,7 +76,7 @@ The vanilla, build-free frontend is the default decision; introducing Node.js, a
 │   │   ├── lib/             # api client, store, actions, player (Tone.js), timebase, i18n, dom
 │   │   ├── views/           # Arrangement, ClipEditor, Transport
 │   │   └── components/
-│   └── vendor/              # prebuilt third-party ES modules (Tone.js, SF2 synth)
+│   └── vendor/              # prebuilt third-party ES modules (SpessaSynth + deps); provenance in vendor/README.md
 ├── tests/
 │   ├── core/                # pure-logic tests (fast, always run)
 │   ├── api/                 # API tests with in-memory SQLite and a FakeEngine
@@ -97,6 +98,7 @@ make test         # pytest (no inference)
 make test-infer   # pytest -m inference (downloads weights if missing)
 make lint         # ruff check + ruff format --check + mypy app
 make fetch-models # pre-download prism_medium and yellow_medium
+make fetch-soundfont # download the default sound bank (MuseScore General, MIT) into data/soundfonts
 make bench        # scripts/benchmark_models.py
 ```
 
@@ -204,9 +206,13 @@ GET    /clips/{id}              ; PATCH /clips/{id}          # notes edit, lock
 GET    /clips/{id}/versions     ; POST /clips/{id}/restore/{version_id}
 POST   /generate                            # {section_id, track_id, bars, controls, n_candidates, seed?}
 POST   /generate/vary                       # next-best candidate from the last generation
-GET    /export/project/{id}.mid             # master multitrack
+GET    /export/project/{id}.mid             # master multitrack; ?start=&end= instance range, &loop=true adds CC116/117 loop markers (playback)
 GET    /export/track/{id}.mid               # single track over the arrangement
 POST   /import/midi                         # import .mid as clips (context or content)
+GET    /soundfonts                          # banks, active bank, default and suggested banks
+POST   /soundfonts?filename=                # upload a bank as the raw request body (.sf2/.sf3/.dls)
+POST   /soundfonts/default                  # download the default bank (MuseScore General)
+GET    /soundfonts/{id}/file ; PUT /soundfonts/active ; DELETE /soundfonts/{id}
 ```
 
 `/generate` is long-running (seconds): return a job id and stream progress over Server-Sent Events (`GET /jobs/{id}/events`; also `GET /jobs/{id}` for status and `POST /jobs/{id}/cancel`); the first candidate's notes may be streamed as soon as available. Jobs are serialized through one worker (single model instance); cancelling a job must abort sampling.
@@ -266,8 +272,9 @@ Work milestone by milestone. Do not start M(n+1) before M(n) acceptance passes.
 - **Attribute and field names** of `midigpt` are verified at runtime (M1), not assumed.
 - **No chord conditioning in `yellow_medium`.** When it is the active model, harmony coherence comes only from context tracks and from the scorer's `CT`; use more candidates (N=8).
 - **Latency** is unmeasured until M5; do not promise numbers in the UI.
-- **SoundFont synth not chosen yet.** M3 plays with Tone.js built-in synths (one timbre per role, synthesized drums); the user judged their quality insufficient, so GM SoundFont playback is a P1 item (`docs/BACKLOG.md` B-01…B-04, decision D1; research and proposal in `docs/audio-playback.md`: SpessaSynth + MuseScore General, plus user-imported banks). Picking the SF2 synth library and the `.sf2` file (licence, size, not committed if large) needs approval before adding it.
-- **Headless browsers cannot verify audio.** In headless Chrome the AudioContext clock does not advance, so playback can only be confirmed by ear in a real browser.
+- **Sound bank licences.** Only banks whose licence allows it are downloaded by the app (MuseScore General, MIT). Banks such as Timbres of Heaven (non-commercial, no redistribution) are only imported by the user; never host or bundle them.
+- **Playback = export.** The browser plays the server-exported MIDI through SpessaSynth, so playback and the DAW export cannot drift. The JS channel map (`web/js/lib/player.js` `channelMap`) must mirror `app/midi_io.py` `_channels`.
+- **Headless browsers cannot verify live audio.** In headless Chrome the audio thread does not run (AudioWorklet modules never load, the clock stays at 0). Verify synthesis offline with `spessasynth_core` (`SpessaSynthProcessor` + `SpessaSynthSequencer` on the main thread) and confirm live playback by ear.
 
 ---
 

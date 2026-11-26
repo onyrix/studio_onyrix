@@ -14,7 +14,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | M0 | Repo, tooling, schema + Alembic, core model + timebase | ✅ | `make test` green; schema migrates from empty. |
 | M1 | Model spike | ✅ | `scripts/m1_spike.py`, findings in `docs/midigpt-notes.md`. |
 | M2 | Adapter, engine, candidates, scorer, post-processing, `/generate` + SSE | ✅ | 4 candidates, best by S, same seed ⇒ same notes, with the real model too. |
-| M3 | Vanilla frontend: arrangement timeline, transport, playback, export | ✅ | Playback confirmed audible in the browser by the user (2026-11-26). Sound quality of Tone.js built-in synths judged poor → B-01. |
+| M3 | Vanilla frontend: arrangement timeline, transport, playback, export | ✅ | Playback confirmed audible by the user (2026-11-26). Tone.js timbres judged poor → replaced by SpessaSynth + SoundFont banks (B-01…B-04). |
 | M4 | Clip editor, replace / vary / lock / history, section reorder + duplicate | ⬜ | Next milestone. Items B-10…B-19. |
 | M5 | Import `.mid`, rule-based planner, benchmark | ⬜ | Items B-40…B-42. |
 | M6 | Packaging (PyInstaller, pywebview, CI matrix) | ⬜ | Items B-50…B-51. |
@@ -23,7 +23,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 
 | ID | Question | Options | Blocks |
 |---|---|---|---|
-| D1 ❓ | Which JS SoundFont synth and which banks? | **Proposed, awaiting approval:** SpessaSynth (Apache-2.0, SF2/SF3/DLS, built-in sequencer) + MuseScore General (MIT) as default bank, user import for any other bank. Criteria from the user: maximum quality, import of downloaded banks, open-source only. Research: `docs/audio-playback.md`. | B-01…B-04 |
+| D1 ✅ | Which JS SoundFont synth and which banks? | **Decided (2026-11-26):** SpessaSynth (Apache-2.0) + MuseScore General (MIT) as default bank, user import for any other bank. Criteria: maximum quality, import of downloaded banks, open source. `docs/audio-playback.md`. | — |
 | D2 ❓ | What does "Duplicate section" do? | (a) new instance of the same section, edits apply everywhere (current model); (b) independent copy; (c) both, as two commands. | B-10 |
 | D3 ❓ | How should bass/harmony follow chord changes? | More candidates (N=8); bar-by-bar generation with per-bar masks (slower); higher CT weight for bass; stronger chord context. | B-20 |
 | D4 ❓ | What is "Regenerate with note" (CLAUDE.md §8)? | Free-text hint mapped to controls (density, register…) or passed to the LLM planner. | B-16 |
@@ -33,10 +33,12 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 
 | ID | Item | Status | Notes |
 |---|---|---|---|
-| B-01 | **SoundFont playback with SpessaSynth** (replaces Tone.js) | ❓ D1 | Vendor `spessasynth_lib`/`spessasynth_core` (+ `fflate`, `stb-vorbis`) in `web/vendor/spessasynth/` with a native import map; play the server-exported MIDI through the SpessaSynth `Sequencer` (loop, playhead from the sequencer); mute/solo by muting MIDI channels (same layout as `app/midi_io.py`). Remove Tone.js afterwards. Design: `docs/audio-playback.md`. |
-| B-02 | Section-range MIDI export for playback | ⬜ | e.g. `GET /api/export/project/{id}.mid?from=&to=` (instance indexes), so the browser plays exactly what the DAW export contains. |
-| B-03 | Sound bank storage and default bank | ❓ D1 | `data/soundfonts/` (git-ignored); `GET/POST/DELETE /api/soundfonts`, serve the file, active bank as a setting; `make fetch-soundfont` / `tasks.ps1 fetch-soundfont` downloads MuseScore General (MIT). Banks are never committed. |
-| B-04 | "Suoni" dialog: import a downloaded bank (`.sf2/.sf3/.dls`), choose the active one | ❓ D1 | Shows licence notes for suggested downloads (GeneralUser GS 2.0, FluidR3_GM, Timbres of Heaven: non-commercial, user download only). |
+| B-01 | **SoundFont playback with SpessaSynth** (replaces Tone.js) | ✅ | Plays the server-exported MIDI via the SpessaSynth `Sequencer`; loop from export loop markers; live mute/solo on MIDI channels; Tone.js removed (`b7f76d7`). Verified headless by offline rendering with the real bank; **live listening check by the user pending** (B-05). |
+| B-02 | Section-range MIDI export for playback | ✅ | `?start=&end=&loop=true` (`77a7066`). |
+| B-03 | Sound bank storage and default bank | ✅ | `data/soundfonts/` (git-ignored), list / upload / serve / active / delete, `fetch-soundfont` and in-app download of MuseScore General (`f256fe4`). |
+| B-04 | "Suoni" dialog: import, choose active, delete, licence notes | ✅ | (`b7f76d7`). |
+| B-05 | Listen to the new playback in a real browser (section, loop, play all, mute/solo, bank switch) | 🟡 | Headless browsers cannot run the AudioWorklet. |
+| B-06 | Optional: per-project bank, reverb/chorus amount, master volume | ⬜ | P3 ideas, not requested yet. |
 | B-10 | Section commands in the timeline: rename, duplicate (per D2), delete instance, insert a new section at a position | ❓ D2 | API exists: `PATCH /sections/{id}`, `PUT /projects/{id}/arrangement`, `DELETE /sections/{id}`. |
 | B-11 | Drag section blocks to reorder | ⬜ | `PUT /projects/{id}/arrangement`. |
 | B-12 | Lock / unlock a part in the UI | ⬜ | API exists (`PATCH /clips/{id}` `locked`). Locked parts are never regenerated and always used as context. |
@@ -85,6 +87,8 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | B-51 | PyInstaller build per OS with a pywebview window; weights never bundled (licence) | ⬜ |
 
 ## Done (recent)
+
+- ✅ SoundFont playback: SpessaSynth + MuseScore General, bank import/management, section-range export (B-01…B-04).
 
 - ✅ M3 accepted: playback audible in the browser (user check, 2026-11-26).
 - ✅ Timeline arrangement view: tracks as rows, time left → right, sections as bar blocks, zoom, playhead (`5c3dad5`).

@@ -13,13 +13,18 @@ Windows:
 ```powershell
 .\tasks.ps1 setup
 .\tasks.ps1 migrate
-.\tasks.ps1 run      # http://127.0.0.1:8000
+.\tasks.ps1 fetch-soundfont   # default sound bank, MuseScore General (MIT), ~40 MB
+.\tasks.ps1 run               # http://127.0.0.1:8000
 ```
 
 macOS / Linux:
 
 ```bash
-make setup && make migrate && make run
+make setup && make migrate && make fetch-soundfont && make run
 ```
 
 Other targets: `dev`, `test`, `test-infer`, `lint`, `fetch-models`, `bench`.
+
+## Sounds
+
+Playback uses SpessaSynth with a SoundFont/DLS bank. The default bank (MuseScore General) can also be downloaded from the **♫** button in the app; any other `.sf2/.sf3/.dls` you download can be imported there. Banks stay in `data/soundfonts/` and are never committed. Check each bank's licence: some are for non-commercial use only.
