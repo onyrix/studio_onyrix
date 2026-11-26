@@ -217,7 +217,7 @@ POST   /import/midi                         # import .mid as clips (context or c
 
 Three views only. Keep it simple; resist adding more.
 
-1. **Arrangement**: rows = section instances in order, columns = tracks. Each cell is a clip with `Generate / Vary / Regenerate with note / Lock / Replace`. Drag to reorder sections, duplicate instance, rename.
+1. **Arrangement**: a DAW-style timeline. Time runs left to right with a bar ruler on top; **rows = tracks** (name, role, mute/solo on the left, sticky while scrolling); **section instances are blocks of bars** whose width is proportional to their length, in arrangement order. The block where a track row meets a section instance is that track's part (clip) in the section, with `Generate / Vary / Regenerate with note / Lock / Replace`. A repeated section shows the same parts in every instance. Click a section header to select it; drag to reorder sections, duplicate instance, rename. Horizontal zoom (px per bar) and a playhead that moves with the transport.
 2. **Clip editor**: minimal piano roll (canvas, pan/zoom, draw/move/resize/delete, snap to 16th) and a drum step grid for drum tracks.
 3. **Transport + export**: play section / play all, loop selected section, tempo display, export buttons.
 

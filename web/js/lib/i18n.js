@@ -50,6 +50,11 @@ const MESSAGES = {
     "section.barsCount": "{bars} battute",
 
     "arrangement.empty": "Aggiungi almeno una traccia e una sezione.",
+    "arrangement.label": "Timeline dell'arrangiamento",
+    "arrangement.tracks": "Tracce",
+    "transport.zoom": "Zoom",
+    "transport.zoomIn": "Ingrandisci",
+    "transport.zoomOut": "Riduci",
 
     "cell.generate": "Genera",
     "cell.regenerate": "Rigenera",

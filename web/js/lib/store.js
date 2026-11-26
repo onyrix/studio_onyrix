@@ -16,6 +16,8 @@
  *   selected: number,
  *   loop: boolean,
  *   playing: null | "section" | "all",
+ *   playFromBar: number,
+ *   zoom: number,
  *   message: string,
  * }} State
  */
@@ -29,6 +31,8 @@ const state = {
   selected: 0,
   loop: true,
   playing: null,
+  playFromBar: 0,
+  zoom: 56,
   message: "",
 };
 
