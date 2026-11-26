@@ -51,7 +51,7 @@ strict = true
 packages = ["app"]
 
 [[tool.mypy.overrides]]
-module = ["mido.*"]
+module = ["mido.*", "midigpt.*", "torch.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
