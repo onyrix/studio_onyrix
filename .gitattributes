@@ -1,0 +1,2 @@
+# Vendored files must stay byte-identical to upstream (checksums in web/vendor/README.md).
+web/vendor/** -text
