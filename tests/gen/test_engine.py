@@ -4,6 +4,7 @@ import pytest
 
 from app.core.harmony import parse_chord
 from app.core.model import Note, Role
+from app.core.progression import bar_spans
 from app.core.roles import role_spec
 from app.gen.adapter import ContextTrack, GenerationSpec
 from app.gen.engine import (
@@ -22,7 +23,7 @@ def spec(**kw: object) -> GenerationSpec:
         "target_role": Role.BASS,
         "target_spec": role_spec(Role.BASS),
         "target_program": 33,
-        "chords": (parse_chord("Am"), parse_chord("F")),
+        "chords": bar_spans([parse_chord("Am"), parse_chord("F")]),
         "seed": 100,
     }
     defaults.update(kw)
@@ -99,7 +100,7 @@ def test_rank_scores_before_the_harmonic_snap_and_keeps_snapped_notes() -> None:
     best = ranked[0]
     assert best.breakdown is not None and best.breakdown.ct == 0.0  # the model missed the chords
     chords = spec().chords
-    assert all(n.p % 12 in chords[n.t // 1920].pitch_class_set for n in best.notes)  # fixed
+    assert all(n.p % 12 in chords[n.t // 1920].chord.pitch_class_set for n in best.notes)
 
     raw = rank_candidates(spec(harmony="off"), [RawCandidate(1, off_chord)])[0]
     assert {n.p for n in raw.notes} == {34}

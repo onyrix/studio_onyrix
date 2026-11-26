@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from app.core import drums
 from app.core.model import Note, Role
+from app.core.progression import ChordSpan, chord_at
 from app.core.roles import RoleSpec
 from app.core.timebase import FOUR_FOUR, PPQ, TimeSignature, bar_ticks
 
@@ -29,7 +30,7 @@ ROLE_WEIGHTS: dict[Role, dict[str, float]] = {
 class ScoringContext:
     spec: RoleSpec
     bars: int
-    chord_pcs: Sequence[frozenset[int] | None] = ()  # per bar; None = no harmony for that bar
+    chords: Sequence[ChordSpan] = ()  # chord timeline; ticks outside every span have no harmony
     kick_onsets: frozenset[int] | None = None  # clip-relative ticks of kick hits in context
     target_notes_per_bar: float | None = None  # overrides spec.target_notes_per_bar
     four_on_floor: bool = False
@@ -59,17 +60,16 @@ def _strong_beat_notes(notes: Sequence[Note], ts: TimeSignature) -> list[Note]:
 
 
 def chord_tone_ratio(notes: Sequence[Note], ctx: ScoringContext) -> float:
-    if not any(ctx.chord_pcs):
+    if not ctx.chords:
         return 1.0  # no harmony to follow
     counted = 0
     hits = 0
     for note in _strong_beat_notes(notes, ctx.ts):
-        bar = note.t // bar_ticks(ctx.ts)
-        pcs = ctx.chord_pcs[bar % len(ctx.chord_pcs)]
-        if pcs is None:
+        chord = chord_at(ctx.chords, note.t)
+        if chord is None:
             continue
         counted += 1
-        hits += note.p % 12 in pcs
+        hits += note.p % 12 in chord.pitch_class_set
     return hits / counted if counted else 0.0
 
 

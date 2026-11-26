@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.deps import DbSession, EngineDep, JobsDep, SettingsDep, get_or_404
 from app.api.schemas import GenerateRequest, JobOut
 from app.config import Settings
-from app.core.harmony import chord_grid_for_bars, chord_slot_from_dict
 from app.core.model import ClipSource, Key, Mode, Note, Role
+from app.core.progression import chord_timeline, event_from_dict
 from app.core.roles import role_spec
 from app.core.timebase import TimeSignature
 from app.db.models import Clip, ClipVersion, Section, SectionSlot, Track
@@ -71,7 +71,8 @@ def build_spec(
         raise HTTPException(409, "the clip in this slot is locked")
 
     grid = section.chord_grid or project.chord_grid
-    chords = chord_grid_for_bars([chord_slot_from_dict(c) for c in grid], section.bars)
+    ts = TimeSignature(project.ts_numerator, project.ts_denominator)
+    chords = chord_timeline([event_from_dict(c) for c in grid], section.bars, ts)
     role = Role(track.role)
     n = body.n_candidates or settings.n_candidates
     seed = body.seed if body.seed is not None else secrets.randbelow(SEED_LIMIT)
@@ -82,10 +83,10 @@ def build_spec(
         target_program=track.program,
         context=_context_tracks(section, track.id),
         bpm=project.bpm,
-        ts=TimeSignature(project.ts_numerator, project.ts_denominator),
+        ts=ts,
         key=Key(project.key_tonic, Mode(project.key_mode)),
         genre=project.genre,
-        chords=tuple(chords),
+        chords=chords,
         density=body.controls.density,
         n_candidates=n,
         seed=seed,

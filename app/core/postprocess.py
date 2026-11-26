@@ -10,7 +10,8 @@ from __future__ import annotations
 import random
 from collections.abc import Iterable, Sequence
 
-from app.core.model import ChordSlot, Note, Role
+from app.core.model import Note, Role
+from app.core.progression import ChordSpan, span_at
 from app.core.roles import RoleSpec
 from app.core.timebase import FOUR_FOUR, PPQ, STEP_TICKS, TimeSignature, bar_ticks
 
@@ -122,7 +123,7 @@ def _nearest_in(pitch: int, pcs: frozenset[int], low: int, high: int) -> int | N
 
 def harmonic_snap(
     notes: Iterable[Note],
-    chords: Sequence[ChordSlot | None],
+    chords: Sequence[ChordSpan],
     spec: RoleSpec,
     clip_ticks: int,
     ts: TimeSignature = FOUR_FOUR,
@@ -131,42 +132,41 @@ def harmonic_snap(
 ) -> tuple[Note, ...]:
     """Move out-of-chord notes to the nearest chord tone in the role range (CLAUDE.md 6.8).
 
-    `chords` has one entry per bar (cycled; None = no harmony for that bar). Levels:
+    `chords` is the section's chord timeline (ticks outside every span have no harmony). A
+    "chord start" is the first tick of a span or a bar downbeat inside it. Levels:
     - off: unchanged;
-    - light: only notes starting on a bar's downbeat;
+    - light: only notes starting on a chord start;
     - normal: notes on beats for monophonic roles, every onset for polyphonic roles; notes
-      sounding into a bar whose chord excludes them are trimmed at the bar line;
+      sounding into a chord that excludes them are trimmed at the chord change;
     - strict: every onset for every role, plus the trimming.
-    `bass_root` puts the bass note starting on each downbeat on the chord root.
+    `bass_root` puts the bass note on each chord start on the chord root.
     Drums are never touched. Deterministic and idempotent; run `postprocess` afterwards to
     remove duplicates the moves may create.
     """
     if level not in HARMONY_LEVELS:
         raise ValueError(f"unknown harmony level {level!r}")
     result = tuple(notes)
-    if spec.is_drum or level == "off" or not any(chords):
+    if spec.is_drum or level == "off" or not chords:
         return result
     bar_len = bar_ticks(ts)
     beat = PPQ * 4 // ts.denominator
 
-    def chord_at(tick: int) -> ChordSlot | None:
-        return chords[(tick // bar_len) % len(chords)]
-
     out = []
     for note in result:
-        chord = chord_at(note.t)
+        span = span_at(chords, note.t)
         pitch = note.p
         end = note.end
-        if chord is not None:
-            offset = note.t % bar_len
+        if span is not None:
+            chord = span.chord
+            chord_start = note.t == span.start or note.t % bar_len == 0
             if level == "light":
-                applies = offset == 0
+                applies = chord_start
             elif level == "strict" or not spec.monophonic:
                 applies = True
             else:
-                applies = offset % beat == 0
+                applies = (note.t % bar_len) % beat == 0
             target: frozenset[int] | None = None
-            if spec.role is Role.BASS and bass_root and offset == 0:
+            if spec.role is Role.BASS and bass_root and chord_start:
                 target = frozenset({chord.root})
             elif applies and pitch % 12 not in chord.pitch_class_set:
                 target = chord.pitch_class_set
@@ -174,13 +174,12 @@ def harmonic_snap(
                 moved = _nearest_in(pitch, target, spec.low, spec.high)
                 pitch = pitch if moved is None else moved
         if level in ("normal", "strict"):
-            boundary = (note.t // bar_len + 1) * bar_len
-            while boundary < min(end, clip_ticks):
-                following = chord_at(boundary)
-                if following is not None and pitch % 12 not in following.pitch_class_set:
-                    end = boundary
+            for following in chords:
+                if following.start <= note.t or following.start >= min(end, clip_ticks):
+                    continue
+                if pitch % 12 not in following.chord.pitch_class_set:
+                    end = following.start
                     break
-                boundary += bar_len
         out.append(Note(t=note.t, p=pitch, d=end - note.t, v=note.v))
     return tuple(out)
 

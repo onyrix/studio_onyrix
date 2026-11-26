@@ -172,7 +172,7 @@ def scoring_context(spec: GenerationSpec) -> ScoringContext:
     return ScoringContext(
         spec=spec.target_spec,
         bars=spec.bars,
-        chord_pcs=tuple(c.pitch_class_set if c else None for c in spec.chords),
+        chords=spec.chords,
         kick_onsets=kicks or None,
         four_on_floor=drums.is_four_on_floor(spec.genre),
         ts=spec.ts,

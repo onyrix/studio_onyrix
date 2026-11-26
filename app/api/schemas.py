@@ -8,23 +8,26 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.config import MAX_CANDIDATES
-from app.core.harmony import chord_slot_from_dict, chord_slot_to_dict, parse_chord
 from app.core.model import Mode, Role
+from app.core.progression import event_from_dict, event_to_dict
 
 MAX_SECTION_BARS = 64
 
-ChordIn = str | dict[str, Any]
+# A chord grid arrives as progression text ("C*2 (Am F) G:3", see core.progression), as a list
+# of chord tokens (joined into text), or as a list of stored event dicts
+# ({root, quality[, pitch_class_set][, beats]}). Text needs the project's time signature, so it
+# is kept as a string here and parsed by the route (`app.api.projects.resolve_grid`).
+ChordGridIn = list[dict[str, Any]] | str
 
 
-def normalize_chord_grid(value: list[ChordIn] | None) -> list[dict[str, Any]] | None:
-    """Accept chord symbols ("Am7") or {root, quality[, pitch_class_set]} dicts."""
-    if value is None:
-        return None
-    out = []
-    for item in value:
-        slot = parse_chord(item) if isinstance(item, str) else chord_slot_from_dict(item)
-        out.append(chord_slot_to_dict(slot))
-    return out
+def normalize_chord_grid(value: Any) -> Any:
+    if value is None or isinstance(value, str):
+        return value
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return " ".join(value)
+    if isinstance(value, list):
+        return [event_to_dict(event_from_dict(item)) for item in value]
+    raise ValueError("chord_grid must be text, a list of chord symbols or a list of chords")
 
 
 class _ChordGridMixin(BaseModel):
@@ -33,7 +36,7 @@ class _ChordGridMixin(BaseModel):
     def _parse_grid(cls, value: Any) -> Any:
         try:
             return normalize_chord_grid(value)
-        except (ValueError, KeyError) as exc:
+        except (ValueError, KeyError, TypeError) as exc:
             raise ValueError(str(exc)) from exc
 
 
@@ -45,7 +48,7 @@ class ProjectCreate(_ChordGridMixin):
     key_tonic: int = Field(default=0, ge=0, le=11)
     key_mode: Mode = Mode.MAJOR
     genre: str = ""
-    chord_grid: list[dict[str, Any]] = Field(default_factory=list)
+    chord_grid: ChordGridIn = Field(default_factory=list)
 
     @field_validator("ts_denominator")
     @classmethod
@@ -61,7 +64,7 @@ class ProjectPatch(_ChordGridMixin):
     key_tonic: int | None = Field(default=None, ge=0, le=11)
     key_mode: Mode | None = None
     genre: str | None = None
-    chord_grid: list[dict[str, Any]] | None = None
+    chord_grid: ChordGridIn | None = None
 
 
 class TrackCreate(BaseModel):
@@ -92,12 +95,12 @@ class TrackOut(BaseModel):
 class SectionCreate(_ChordGridMixin):
     name: str = Field(min_length=1, max_length=200)
     bars: int = Field(ge=1, le=MAX_SECTION_BARS)
-    chord_grid: list[dict[str, Any]] = Field(default_factory=list)
+    chord_grid: ChordGridIn = Field(default_factory=list)
 
 
 class SectionPatch(_ChordGridMixin):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    chord_grid: list[dict[str, Any]] | None = None
+    chord_grid: ChordGridIn | None = None
 
 
 class SectionOut(BaseModel):
@@ -105,6 +108,7 @@ class SectionOut(BaseModel):
     name: str
     bars: int
     chord_grid: list[dict[str, Any]]
+    chord_text: str
     slots: dict[int, int]  # track_id -> clip_id
 
 
@@ -118,6 +122,7 @@ class ProjectOut(BaseModel):
     key_mode: Mode
     genre: str
     chord_grid: list[dict[str, Any]]
+    chord_text: str
     tracks: list[TrackOut]
     sections: list[SectionOut]
     arrangement: list[int]  # section ids in order

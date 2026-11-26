@@ -24,16 +24,42 @@ from app.api.schemas import (
 )
 from app.core.harmony import chord_slot_from_dict, chord_symbol
 from app.core.model import Key, Mode
+from app.core.progression import (
+    event_from_dict,
+    event_to_dict,
+    parse_progression,
+    progression_text,
+)
 from app.core.roles import role_spec
+from app.core.timebase import TimeSignature
 from app.db.models import ArrangementItem, Project, Section, Track
 
 router = APIRouter(tags=["projects"])
 
 
+def project_ts(project: Project) -> TimeSignature:
+    return TimeSignature(project.ts_numerator, project.ts_denominator)
+
+
+def resolve_grid(value: Any, ts: TimeSignature) -> Any:
+    """Progression text -> stored event dicts (see core.progression); lists pass through."""
+    if not isinstance(value, str):
+        return value
+    try:
+        return [event_to_dict(e) for e in parse_progression(value, ts)]
+    except ValueError as exc:
+        raise HTTPException(422, f"chord_grid: {exc}") from exc
+
+
 def grid_out(grid: list[dict[str, Any]], project: Project) -> list[dict[str, Any]]:
-    """Stored chord dicts plus a display `symbol` spelled for the project key (C/E, Bb...)."""
+    """Stored chord events plus a display `symbol` spelled for the project key (C/E, Bb...)."""
     key = Key(project.key_tonic, Mode(project.key_mode))
     return [{**c, "symbol": chord_symbol(chord_slot_from_dict(c), key)} for c in grid]
+
+
+def grid_text(grid: list[dict[str, Any]], project: Project) -> str:
+    key = Key(project.key_tonic, Mode(project.key_mode))
+    return progression_text([event_from_dict(c) for c in grid], key, project_ts(project))
 
 
 def section_out(section: Section) -> SectionOut:
@@ -42,6 +68,7 @@ def section_out(section: Section) -> SectionOut:
         name=section.name,
         bars=section.bars,
         chord_grid=grid_out(section.chord_grid, section.project),
+        chord_text=grid_text(section.chord_grid, section.project),
         slots={slot.track_id: slot.clip_id for slot in section.slots},
     )
 
@@ -57,6 +84,7 @@ def project_out(project: Project) -> ProjectOut:
         key_mode=project.key_mode,  # type: ignore[arg-type]
         genre=project.genre,
         chord_grid=grid_out(project.chord_grid, project),
+        chord_text=grid_text(project.chord_grid, project),
         tracks=[TrackOut.model_validate(t) for t in project.tracks],
         sections=[section_out(s) for s in project.sections],
         arrangement=[item.section_id for item in project.arrangement],
@@ -70,7 +98,10 @@ def list_projects(db: DbSession) -> list[Project]:
 
 @router.post("/projects", response_model=ProjectOut, status_code=201)
 def create_project(body: ProjectCreate, db: DbSession) -> ProjectOut:
-    project = Project(**body.model_dump(mode="json"))
+    data = body.model_dump(mode="json")
+    ts = TimeSignature(body.ts_numerator, body.ts_denominator)
+    data["chord_grid"] = resolve_grid(data["chord_grid"], ts)
+    project = Project(**data)
     db.add(project)
     db.commit()
     return project_out(project)
@@ -85,6 +116,8 @@ def get_project(project_id: int, db: DbSession) -> ProjectOut:
 def patch_project(project_id: int, body: ProjectPatch, db: DbSession) -> ProjectOut:
     project = get_or_404(db, Project, project_id)
     for key, value in body.model_dump(mode="json", exclude_unset=True).items():
+        if key == "chord_grid":
+            value = resolve_grid(value, project_ts(project))
         if value is not None:
             setattr(project, key, value)
     db.commit()
@@ -134,7 +167,8 @@ def delete_track(track_id: int, db: DbSession) -> Response:
 def create_section(project_id: int, body: SectionCreate, db: DbSession) -> SectionOut:
     """Create a section and append one instance of it to the arrangement."""
     project = get_or_404(db, Project, project_id)
-    section = Section(name=body.name, bars=body.bars, chord_grid=body.chord_grid)
+    grid = resolve_grid(body.chord_grid, project_ts(project))
+    section = Section(name=body.name, bars=body.bars, chord_grid=grid)
     project.sections.append(section)
     db.flush()
     project.arrangement.append(
@@ -148,6 +182,8 @@ def create_section(project_id: int, body: SectionCreate, db: DbSession) -> Secti
 def patch_section(section_id: int, body: SectionPatch, db: DbSession) -> SectionOut:
     section = get_or_404(db, Section, section_id)
     for key, value in body.model_dump(exclude_unset=True).items():
+        if key == "chord_grid":
+            value = resolve_grid(value, project_ts(section.project))
         if value is not None:
             setattr(section, key, value)
     db.commit()

@@ -76,7 +76,7 @@ def test_context_chords_and_key_reach_the_engine(
     assert spec.target_role is Role.BASS
     assert [c.role for c in spec.context] == [Role.DRUMS]
     assert spec.context[0].notes
-    assert spec.chords == tuple(parse_chord(c) for c in ("Am", "F", "C", "G"))
+    assert [s.chord for s in spec.chords] == [parse_chord(c) for c in ("Am", "F", "C", "G")]
     assert (spec.key.tonic, spec.key.mode.value) == (9, "minor")  # type: ignore[union-attr]
     assert (spec.bpm, spec.bars, spec.genre) == (100, 4, "pop")
 
@@ -86,7 +86,16 @@ def test_section_chord_grid_overrides_project(
 ) -> None:
     client.patch(f"/api/sections/{project['section']['id']}", json={"chord_grid": ["Dm", "E7"]})
     run_to_end(client, project, "lead", seed=3)
-    assert [c.root for c in engine.calls[-1].chords] == [2, 4, 2, 4]  # type: ignore[union-attr]
+    assert [s.chord.root for s in engine.calls[-1].chords] == [2, 4, 2, 4]  # type: ignore[union-attr]
+
+
+def test_harmonic_rhythm_reaches_the_engine_as_a_timeline(
+    client: TestClient, project: dict[str, Any], engine: FakeEngine
+) -> None:
+    client.patch(f"/api/sections/{project['section']['id']}", json={"chord_grid": "(Dm G) C*2"})
+    run_to_end(client, project, "bass", seed=4)
+    spans = [(s.start, s.end, s.chord.root) for s in engine.calls[-1].chords]
+    assert spans == [(0, 960, 2), (960, 1920, 7), (1920, 5760, 0), (5760, 6720, 2), (6720, 7680, 7)]
 
 
 def test_locked_clip_cannot_be_regenerated(client: TestClient, project: dict[str, Any]) -> None:

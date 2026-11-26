@@ -3,14 +3,15 @@ import pytest
 from app.core import drums
 from app.core.harmony import parse_chord
 from app.core.model import Note, Role
+from app.core.progression import bar_spans
 from app.core.roles import role_spec
 from app.core.scorer import ScoringContext, hard_constraint_violation, score_notes
 
-AM_F = [parse_chord("Am").pitch_class_set, parse_chord("F").pitch_class_set]
+AM_F = bar_spans([parse_chord("Am"), parse_chord("F")])
 
 
 def bass_ctx(**kw: object) -> ScoringContext:
-    defaults: dict[str, object] = {"spec": role_spec(Role.BASS), "bars": 2, "chord_pcs": AM_F}
+    defaults: dict[str, object] = {"spec": role_spec(Role.BASS), "bars": 2, "chords": AM_F}
     defaults.update(kw)
     return ScoringContext(**defaults)  # type: ignore[arg-type]
 

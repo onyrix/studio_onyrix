@@ -114,13 +114,6 @@ def chord_slot_from_dict(data: dict[str, object]) -> ChordSlot:
     return ChordSlot(root=root, quality=quality, pitch_class_set=pitch_classes)
 
 
-def chord_grid_for_bars(grid: list[ChordSlot], bars: int) -> list[ChordSlot | None]:
-    """Cycle `grid` over `bars` bars; an empty grid means "no harmony" for every bar."""
-    if not grid:
-        return [None] * bars
-    return [grid[i % len(grid)] for i in range(bars)]
-
-
 # ---- Naming ------------------------------------------------------------------------------
 
 SHARP_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")

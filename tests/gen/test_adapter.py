@@ -2,6 +2,7 @@ import pytest
 
 from app.core.harmony import parse_chord
 from app.core.model import Key, Mode, Note, Role
+from app.core.progression import bar_spans
 from app.core.roles import role_spec
 from app.gen.adapter import (
     ContextTrack,
@@ -46,7 +47,7 @@ PRISM = ModelCaps(
     genres=("jazz", "dance-electronic"),
 )
 
-CHORDS = tuple(parse_chord(c) for c in ("Am", "F", "C", "G"))
+CHORDS = bar_spans([parse_chord(c) for c in ("Am", "F", "C", "G")])
 
 
 def bass_spec(**kw: object) -> GenerationSpec:
@@ -157,7 +158,7 @@ def test_chord_parts_ask_for_the_chord_size_in_pitch_classes() -> None:
         attribute_levels={"pitch_class_set": "bar"},
         attribute_track_types={"pitch_class_set": "melodic"},
     )
-    chords = (parse_chord("Am7"), parse_chord("F"), None, parse_chord("Cadd9"))
+    chords = bar_spans([parse_chord("Am7"), parse_chord("F"), None, parse_chord("Cadd9")])
     spec = bass_spec(target_role=Role.CHORDS, target_spec=role_spec(Role.CHORDS), chords=chords)
     prompt = build_request(spec, 0, caps).tracks[0]
     assert {b: a.get("pitch_class_set") for b, a in prompt.bar_attributes.items()} == {

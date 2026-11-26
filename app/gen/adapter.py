@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.harmony import scale_pitch_classes
-from app.core.model import ChordSlot, Key, Mode, Note, Role
+from app.core.model import Key, Mode, Note, Role
+from app.core.progression import ChordSpan, chords_in_bar
 from app.core.roles import RoleSpec
 from app.core.timebase import FOUR_FOUR, PPQ, TimeSignature, bar_ticks, bpm_to_us_per_quarter
 
@@ -38,7 +39,7 @@ class GenerationSpec:
     ts: TimeSignature = FOUR_FOUR
     key: Key | None = None
     genre: str = ""
-    chords: tuple[ChordSlot | None, ...] = ()  # per bar
+    chords: tuple[ChordSpan, ...] = ()  # chord timeline over the section (clip-relative ticks)
     density: int | None = None  # 0 (sparsest) .. 9 (densest); drums only on current models
     n_candidates: int = 4
     seed: int = 0
@@ -141,7 +142,7 @@ def pitch_mask(spec: GenerationSpec) -> dict[str, Any]:
     if spec.key is not None:
         pcs = scale_pitch_classes(spec.key)
     else:
-        pcs = frozenset().union(*(c.pitch_class_set for c in spec.chords if c is not None))
+        pcs = frozenset().union(*(s.chord.pitch_class_set for s in spec.chords))
     if pcs:
         mask["pitch_classes"] = sorted(pcs)
     return mask
@@ -176,16 +177,16 @@ def build_request(spec: GenerationSpec, target_index: int, caps: ModelCaps) -> A
         if spec.target_spec.monophonic:
             set_attr(("bar_max_polyphony", "max_polyphony"), 0)  # level 0 = "1 voice"
         # `pitch_class_set` is the COUNT of distinct pitch classes in a bar (B-70), not which
-        # ones: for chord parts, ask for as many pitch classes as the bar's chord has.
+        # ones: for chord parts, ask for as many pitch classes as the bar's chords have.
         if spec.target_role in (Role.CHORDS, Role.PAD) and caps.has(
             "pitch_class_set", "bar", track_type
         ):
             size = caps.attribute_sizes["pitch_class_set"]
             for b in bars:
-                chord = spec.chords[b % len(spec.chords)] if spec.chords else None
-                if chord is not None:
-                    level = _level(len(chord.pitch_class_set), size)
-                    bar_attributes.setdefault(b, {})["pitch_class_set"] = level
+                in_bar = chords_in_bar(spec.chords, b, spec.ts)
+                if in_bar:
+                    count = len(frozenset().union(*(c.pitch_class_set for c in in_bar)))
+                    bar_attributes.setdefault(b, {})["pitch_class_set"] = _level(count, size)
         track_controls["pitch_mask"] = pitch_mask(spec)
     elif spec.density is not None:
         set_attr(("bar_note_density", "note_density"), spec.density)

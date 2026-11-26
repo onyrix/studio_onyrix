@@ -1,7 +1,6 @@
 import pytest
 
 from app.core.harmony import (
-    chord_grid_for_bars,
     chord_slot_from_dict,
     chord_slot_to_dict,
     parse_chord,
@@ -45,9 +44,3 @@ def test_chord_slot_dict_round_trip() -> None:
     slot = parse_chord("Fmaj7")
     assert chord_slot_from_dict(chord_slot_to_dict(slot)) == slot
     assert chord_slot_from_dict({"root": 9, "quality": "m"}) == parse_chord("Am")
-
-
-def test_chord_grid_cycles() -> None:
-    grid = [parse_chord("Am"), parse_chord("F")]
-    assert chord_grid_for_bars(grid, 3) == [grid[0], grid[1], grid[0]]
-    assert chord_grid_for_bars([], 2) == [None, None]

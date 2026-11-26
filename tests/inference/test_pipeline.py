@@ -4,6 +4,7 @@ import pytest
 
 from app.core.harmony import parse_chord
 from app.core.model import Key, Mode, Note, Role
+from app.core.progression import bar_spans
 from app.core.roles import role_spec
 from app.core.timebase import bars_to_ticks
 from app.gen.adapter import ContextTrack, GenerationSpec
@@ -12,7 +13,7 @@ from app.gen.engine import MidiGptEngine, generate_candidates
 pytestmark = pytest.mark.inference
 pytest.importorskip("midigpt.inference")
 
-CHORDS = tuple(parse_chord(c) for c in ("Am", "F", "C", "G"))
+CHORDS = bar_spans([parse_chord(c) for c in ("Am", "F", "C", "G")])
 CHORD_CONTEXT = ContextTrack(
     100,
     Role.CHORDS,
