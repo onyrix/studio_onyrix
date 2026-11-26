@@ -51,20 +51,42 @@ def _to_delta(events: list[tuple[int, int, mido.Message]]) -> list[mido.Message]
     return out
 
 
+# Loop markers understood by SpessaSynth (and other players): CC116 = loop start, CC117 = loop
+# end. They are "undefined" controllers, so they do not change the sound.
+LOOP_START_CC = 116
+LOOP_END_CC = 117
+
+
 def build_midi(
-    name: str, bpm: float, ts: TimeSignature, tracks: Sequence[ExportTrack]
+    name: str,
+    bpm: float,
+    ts: TimeSignature,
+    tracks: Sequence[ExportTrack],
+    loop_ticks: int | None = None,
 ) -> mido.MidiFile:
+    """`loop_ticks`: when set, add loop markers from 0 to that tick (playback files only), which
+    also makes the file last exactly that long even if the last note ends earlier."""
     mid = mido.MidiFile(type=1, ticks_per_beat=PPQ)
-    conductor = mido.MidiTrack(
-        [
-            mido.MetaMessage("track_name", name=name, time=0),
-            mido.MetaMessage("set_tempo", tempo=bpm_to_us_per_quarter(bpm), time=0),
-            mido.MetaMessage(
-                "time_signature", numerator=ts.numerator, denominator=ts.denominator, time=0
+    head = [
+        mido.MetaMessage("track_name", name=name, time=0),
+        mido.MetaMessage("set_tempo", tempo=bpm_to_us_per_quarter(bpm), time=0),
+        mido.MetaMessage(
+            "time_signature", numerator=ts.numerator, denominator=ts.denominator, time=0
+        ),
+    ]
+    markers: list[tuple[int, int, mido.Message]] = []
+    if loop_ticks is not None:
+        markers = [
+            (0, 0, mido.Message("control_change", channel=0, control=LOOP_START_CC, value=0)),
+            (
+                loop_ticks,
+                0,
+                mido.Message("control_change", channel=0, control=LOOP_END_CC, value=0),
             ),
         ]
+    conductor = mido.MidiTrack(
+        [*head, *_to_delta(markers), mido.MetaMessage("end_of_track", time=0)]
     )
-    conductor.append(mido.MetaMessage("end_of_track", time=0))
     mid.tracks.append(conductor)
 
     for track, channel in zip(tracks, _channels(tracks), strict=True):

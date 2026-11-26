@@ -63,3 +63,38 @@ def test_project_clips_endpoint(client: TestClient, project: dict[str, Any]) -> 
     clips = client.get(f"/api/projects/{project['id']}/clips").json()
     assert [c["id"] for c in clips] == [clip_id]
     assert clips[0]["current_version"]["notes"] == [{"t": 0, "p": 33, "d": 480, "v": 100}]
+
+
+def test_export_range_and_loop_markers(client: TestClient, project: dict[str, Any]) -> None:
+    fill(client, project, "bass", [{"t": 0, "p": 33, "d": 480, "v": 100}])
+    verse = project["section"]["id"]
+    chorus = client.post(
+        f"/api/projects/{project['id']}/sections", json={"name": "Chorus", "bars": 2}
+    ).json()["id"]
+    client.put(
+        f"/api/projects/{project['id']}/arrangement", json={"section_ids": [verse, chorus, verse]}
+    )
+
+    def load(query: str) -> mido.MidiFile:
+        response = client.get(f"/api/export/project/{project['id']}.mid{query}")
+        assert response.status_code == 200, response.text
+        return mido.MidiFile(file=io.BytesIO(response.content))
+
+    def events(track: mido.MidiTrack, kind: str) -> list[tuple[int, int]]:
+        now, out = 0, []
+        for msg in track:
+            now += msg.time
+            if msg.type == kind:
+                out.append((now, msg.note if kind == "note_on" else msg.control))
+        return out
+
+    third = load("?start=2&end=3")  # only the second Verse, starting at tick 0
+    assert events(third.tracks[2], "note_on") == [(0, 33)]
+    assert events(third.tracks[0], "control_change") == []  # no markers unless asked
+
+    looped = load("?start=1&end=2&loop=true")  # the 2-bar Chorus: no notes, exact length
+    assert events(looped.tracks[0], "control_change") == [(0, 116), (2 * 1920, 117)]
+    assert events(looped.tracks[2], "note_on") == []
+
+    assert client.get(f"/api/export/project/{project['id']}.mid?start=2&end=5").status_code == 422
+    assert client.get(f"/api/export/project/{project['id']}.mid?start=2&end=2").status_code == 422
