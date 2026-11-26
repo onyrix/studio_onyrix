@@ -23,7 +23,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 
 | ID | Question | Options | Blocks |
 |---|---|---|---|
-| D1 ❓ | Which JS SoundFont synth and which `.sf2`? | See B-01. Library must be proposed and approved (CLAUDE.md rule 6). | B-01 |
+| D1 ❓ | Which JS SoundFont synth and which banks? | **Proposed, awaiting approval:** SpessaSynth (Apache-2.0, SF2/SF3/DLS, built-in sequencer) + MuseScore General (MIT) as default bank, user import for any other bank. Criteria from the user: maximum quality, import of downloaded banks, open-source only. Research: `docs/audio-playback.md`. | B-01…B-04 |
 | D2 ❓ | What does "Duplicate section" do? | (a) new instance of the same section, edits apply everywhere (current model); (b) independent copy; (c) both, as two commands. | B-10 |
 | D3 ❓ | How should bass/harmony follow chord changes? | More candidates (N=8); bar-by-bar generation with per-bar masks (slower); higher CT weight for bass; stronger chord context. | B-20 |
 | D4 ❓ | What is "Regenerate with note" (CLAUDE.md §8)? | Free-text hint mapped to controls (density, register…) or passed to the LLM planner. | B-16 |
@@ -33,7 +33,10 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 
 | ID | Item | Status | Notes |
 |---|---|---|---|
-| B-01 | **Realistic GM playback with a SoundFont** (replaces Tone.js timbres) | ❓ D1 | Play each track with its GM program, drums with the GM kit. Candidate libraries to evaluate: a JS SF2 synth on AudioWorklet (e.g. *spessasynth_lib*) or FluidSynth compiled to WASM (e.g. *js-synthesizer*). Candidate SoundFonts: *GeneralUser GS*, *FluidR3_GM*, *MuseScore General* (check licences and size). The `.sf2` is downloaded on demand (like model weights) and never committed if large; vendor the JS as a prebuilt file in `web/vendor/`. Keep Tone.js only if still useful for the transport. |
+| B-01 | **SoundFont playback with SpessaSynth** (replaces Tone.js) | ❓ D1 | Vendor `spessasynth_lib`/`spessasynth_core` (+ `fflate`, `stb-vorbis`) in `web/vendor/spessasynth/` with a native import map; play the server-exported MIDI through the SpessaSynth `Sequencer` (loop, playhead from the sequencer); mute/solo by muting MIDI channels (same layout as `app/midi_io.py`). Remove Tone.js afterwards. Design: `docs/audio-playback.md`. |
+| B-02 | Section-range MIDI export for playback | ⬜ | e.g. `GET /api/export/project/{id}.mid?from=&to=` (instance indexes), so the browser plays exactly what the DAW export contains. |
+| B-03 | Sound bank storage and default bank | ❓ D1 | `data/soundfonts/` (git-ignored); `GET/POST/DELETE /api/soundfonts`, serve the file, active bank as a setting; `make fetch-soundfont` / `tasks.ps1 fetch-soundfont` downloads MuseScore General (MIT). Banks are never committed. |
+| B-04 | "Suoni" dialog: import a downloaded bank (`.sf2/.sf3/.dls`), choose the active one | ❓ D1 | Shows licence notes for suggested downloads (GeneralUser GS 2.0, FluidR3_GM, Timbres of Heaven: non-commercial, user download only). |
 | B-10 | Section commands in the timeline: rename, duplicate (per D2), delete instance, insert a new section at a position | ❓ D2 | API exists: `PATCH /sections/{id}`, `PUT /projects/{id}/arrangement`, `DELETE /sections/{id}`. |
 | B-11 | Drag section blocks to reorder | ⬜ | `PUT /projects/{id}/arrangement`. |
 | B-12 | Lock / unlock a part in the UI | ⬜ | API exists (`PATCH /clips/{id}` `locked`). Locked parts are never regenerated and always used as context. |
