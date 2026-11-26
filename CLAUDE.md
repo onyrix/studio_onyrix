@@ -266,7 +266,7 @@ Work milestone by milestone. Do not start M(n+1) before M(n) acceptance passes.
 - **Attribute and field names** of `midigpt` are verified at runtime (M1), not assumed.
 - **No chord conditioning in `yellow_medium`.** When it is the active model, harmony coherence comes only from context tracks and from the scorer's `CT`; use more candidates (N=8).
 - **Latency** is unmeasured until M5; do not promise numbers in the UI.
-- **SoundFont synth not chosen yet.** M3 plays with Tone.js built-in synths (one timbre per role, synthesized drums). Picking the SF2 synth library and the `.sf2` file (licence, size, not committed if large) is an open decision; ask before adding it.
+- **SoundFont synth not chosen yet.** M3 plays with Tone.js built-in synths (one timbre per role, synthesized drums); the user judged their quality insufficient, so GM SoundFont playback is a P1 item (`docs/BACKLOG.md` B-01, decision D1). Picking the SF2 synth library and the `.sf2` file (licence, size, not committed if large) needs approval before adding it.
 - **Headless browsers cannot verify audio.** In headless Chrome the AudioContext clock does not advance, so playback can only be confirmed by ear in a real browser.
 
 ---
