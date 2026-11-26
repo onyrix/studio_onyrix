@@ -8,7 +8,7 @@ from app.api.deps import DbSession, get_or_404
 from app.api.schemas import ClipOut, ClipPatch, ClipVersionOut
 from app.core.model import ClipSource
 from app.core.timebase import TimeSignature, bars_to_ticks
-from app.db.models import Clip, ClipVersion
+from app.db.models import Clip, ClipVersion, Project
 
 router = APIRouter(tags=["clips"])
 
@@ -22,6 +22,13 @@ def clip_out(clip: Clip) -> ClipOut:
         locked=clip.locked,
         current_version=ClipVersionOut.model_validate(version) if version else None,
     )
+
+
+@router.get("/projects/{project_id}/clips", response_model=list[ClipOut])
+def list_project_clips(project_id: int, db: DbSession) -> list[ClipOut]:
+    """Every clip of the project with its current notes, so the UI loads them in one call."""
+    project = get_or_404(db, Project, project_id)
+    return [clip_out(clip) for track in project.tracks for clip in track.clips]
 
 
 @router.get("/clips/{clip_id}", response_model=ClipOut)

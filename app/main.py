@@ -12,7 +12,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import clips, generate, health, projects
+from app.api import clips, export, generate, health, projects
 from app.config import WEB_DIR, Settings
 from app.db.base import Base
 from app.db.session import MEMORY_URLS, make_engine, make_session_factory
@@ -44,7 +44,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.state.candidates = {}
 
     api = APIRouter(prefix="/api")
-    for module in (health, projects, clips, generate):
+    for module in (health, projects, clips, generate, export):
         api.include_router(module.router)
     app.include_router(api)
 
