@@ -5,13 +5,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Studio Onyrix</title>
     <link rel="stylesheet" href="css/app.css" />
+    <script src="vendor/tone/Tone.js"></script>
     <script type="module" src="js/main.js"></script>
   </head>
   <body>
-    <main class="shell">
-      <h1 data-i18n="app.title"></h1>
-      <p data-i18n="app.tagline"></p>
-      <p class="status" id="status" data-state="pending"></p>
-    </main>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">◐</span>
+        <span data-i18n="app.title"></span>
+      </div>
+      <nav class="project-bar" id="project-bar"></nav>
+      <span class="status" id="status" data-state="pending"></span>
+    </header>
+
+    <section class="transport" id="transport"></section>
+    <p class="message" id="message" role="status" hidden></p>
+    <main class="arrangement" id="arrangement"></main>
+
+    <dialog id="dialog-project">
+      <form method="dialog" class="form" data-action="create-project">
+        <h2 data-i18n="project.new"></h2>
+        <label><span data-i18n="project.name"></span><input name="name" required maxlength="200" /></label>
+        <div class="row">
+          <label><span data-i18n="project.bpm"></span><input name="bpm" type="number" min="21" max="400" step="1" value="100" required /></label>
+          <label><span data-i18n="project.key"></span><select name="key_tonic" data-options="keys"></select></label>
+          <label><span data-i18n="project.mode"></span><select name="key_mode" data-options="modes"></select></label>
+        </div>
+        <label><span data-i18n="project.genre"></span><input name="genre" placeholder="pop" /></label>
+        <label><span data-i18n="project.chords"></span><input name="chords" placeholder="Am F C G" /><small data-i18n="project.chordsHint"></small></label>
+        <footer>
+          <button type="button" value="cancel" data-close data-i18n="form.close"></button>
+          <button type="submit" class="primary" data-i18n="form.create"></button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="dialog-settings">
+      <form method="dialog" class="form" data-action="update-project">
+        <h2 data-i18n="project.settings"></h2>
+        <label><span data-i18n="project.name"></span><input name="name" required maxlength="200" /></label>
+        <div class="row">
+          <label><span data-i18n="project.bpm"></span><input name="bpm" type="number" min="21" max="400" step="1" required /></label>
+          <label><span data-i18n="project.key"></span><select name="key_tonic" data-options="keys"></select></label>
+          <label><span data-i18n="project.mode"></span><select name="key_mode" data-options="modes"></select></label>
+        </div>
+        <label><span data-i18n="project.genre"></span><input name="genre" /></label>
+        <label><span data-i18n="project.chords"></span><input name="chords" /><small data-i18n="project.chordsHint"></small></label>
+        <footer>
+          <button type="button" data-close data-i18n="form.close"></button>
+          <button type="submit" class="primary" data-i18n="form.save"></button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="dialog-track">
+      <form method="dialog" class="form" data-action="add-track">
+        <h2 data-i18n="track.add"></h2>
+        <label><span data-i18n="track.role"></span><select name="role" data-options="roles"></select></label>
+        <label><span data-i18n="track.name"></span><input name="name" maxlength="200" /></label>
+        <footer>
+          <button type="button" data-close data-i18n="form.close"></button>
+          <button type="submit" class="primary" data-i18n="form.add"></button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="dialog-section">
+      <form method="dialog" class="form" data-action="add-section">
+        <h2 data-i18n="section.add"></h2>
+        <div class="row">
+          <label><span data-i18n="section.name"></span><input name="name" required maxlength="200" /></label>
+          <label><span data-i18n="section.bars"></span><select name="bars"><option>4</option><option selected>8</option><option>12</option><option>16</option></select></label>
+        </div>
+        <label><span data-i18n="section.chords"></span><input name="chords" placeholder="Am F C G" /></label>
+        <footer>
+          <button type="button" data-close data-i18n="form.close"></button>
+          <button type="submit" class="primary" data-i18n="form.add"></button>
+        </footer>
+      </form>
+    </dialog>
   </body>
 </html>

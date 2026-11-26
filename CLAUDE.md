@@ -63,6 +63,7 @@ The vanilla, build-free frontend is the default decision; introducing Node.js, a
 │   ├── gen/
 │   │   ├── adapter.py       # project <-> midigpt Score conversion
 │   │   ├── engine.py        # model loading, sessions, candidate loop
+│   │   ├── jobs.py          # single-worker job queue (serialized, cancellable)
 │   │   └── planner.py       # optional LLM planner (chord grid, sections) — behind an interface
 │   ├── db/                  # SQLAlchemy models, repositories, migrations
 │   └── midi_io.py           # export / import .mid
@@ -70,8 +71,8 @@ The vanilla, build-free frontend is the default decision; introducing Node.js, a
 │   ├── index.html
 │   ├── css/
 │   ├── js/
-│   │   ├── main.js          # entry module
-│   │   ├── lib/             # api client, store, timebase, i18n
+│   │   ├── main.js          # entry module (dialogs, render loop)
+│   │   ├── lib/             # api client, store, actions, player (Tone.js), timebase, i18n, dom
 │   │   ├── views/           # Arrangement, ClipEditor, Transport
 │   │   └── components/
 │   └── vendor/              # prebuilt third-party ES modules (Tone.js, SF2 synth)
@@ -198,6 +199,7 @@ GET/POST   /projects            ; GET/PATCH/DELETE /projects/{id}
 POST   /projects/{id}/tracks    ; PATCH/DELETE /tracks/{id}
 POST   /projects/{id}/sections  ; PATCH/DELETE /sections/{id}
 PUT    /projects/{id}/arrangement           # ordered section instance list
+GET    /projects/{id}/clips                 # every clip with its current notes (UI bulk load)
 GET    /clips/{id}              ; PATCH /clips/{id}          # notes edit, lock
 GET    /clips/{id}/versions     ; POST /clips/{id}/restore/{version_id}
 POST   /generate                            # {section_id, track_id, bars, controls, n_candidates, seed?}
@@ -207,7 +209,7 @@ GET    /export/track/{id}.mid               # single track over the arrangement
 POST   /import/midi                         # import .mid as clips (context or content)
 ```
 
-`/generate` is long-running (seconds): return a job id and stream progress over Server-Sent Events (`GET /jobs/{id}/events`); the first candidate's notes may be streamed as soon as available. Jobs are serialized through one worker (single model instance); cancelling a job must abort sampling.
+`/generate` is long-running (seconds): return a job id and stream progress over Server-Sent Events (`GET /jobs/{id}/events`; also `GET /jobs/{id}` for status and `POST /jobs/{id}/cancel`); the first candidate's notes may be streamed as soon as available. Jobs are serialized through one worker (single model instance); cancelling a job must abort sampling.
 
 ---
 
@@ -264,6 +266,8 @@ Work milestone by milestone. Do not start M(n+1) before M(n) acceptance passes.
 - **Attribute and field names** of `midigpt` are verified at runtime (M1), not assumed.
 - **No chord conditioning in `yellow_medium`.** When it is the active model, harmony coherence comes only from context tracks and from the scorer's `CT`; use more candidates (N=8).
 - **Latency** is unmeasured until M5; do not promise numbers in the UI.
+- **SoundFont synth not chosen yet.** M3 plays with Tone.js built-in synths (one timbre per role, synthesized drums). Picking the SF2 synth library and the `.sf2` file (licence, size, not committed if large) is an open decision; ask before adding it.
+- **Headless browsers cannot verify audio.** In headless Chrome the AudioContext clock does not advance, so playback can only be confirmed by ear in a real browser.
 
 ---
 
