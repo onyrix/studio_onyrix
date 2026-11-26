@@ -23,7 +23,8 @@ def make_app(tmp_path: Path, engine: Any) -> FastAPI:
     an in-memory database (one shared connection and transaction) cannot isolate."""
     url = f"sqlite:///{(tmp_path / 'test.db').as_posix()}"
     Base.metadata.create_all(make_engine(url))
-    return create_app(Settings(database_url=url), engine=engine)
+    settings = Settings(database_url=url, soundfont_dir=str(tmp_path / "soundfonts"))
+    return create_app(settings, engine=engine)
 
 
 @pytest.fixture

@@ -1,7 +1,7 @@
 # Windows equivalent of the Makefile. Usage: .\tasks.ps1 <target>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("setup", "dev", "run", "migrate", "test", "test-infer", "lint", "fetch-models", "bench")]
+    [ValidateSet("setup", "dev", "run", "migrate", "test", "test-infer", "lint", "fetch-models", "fetch-soundfont", "bench")]
     [string]$Target = "test"
 )
 
@@ -32,5 +32,6 @@ switch ($Target) {
         Invoke-Step $Py @("-m", "mypy")
     }
     "fetch-models" { Invoke-Step $Py @("scripts/fetch_models.py") }
+    "fetch-soundfont" { Invoke-Step $Py @("scripts/fetch_soundfont.py") }
     "bench" { Invoke-Step $Py @("scripts/benchmark_models.py") }
 }
