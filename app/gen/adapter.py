@@ -44,6 +44,7 @@ class GenerationSpec:
     seed: int = 0
     temperature: float = 1.0
     top_p: float = 0.95
+    harmony: str = "normal"  # harmonic snap level, see core.postprocess.HARMONY_LEVELS
 
 
 @dataclass(frozen=True)

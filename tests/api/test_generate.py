@@ -2,6 +2,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.harmony import parse_chord
@@ -44,11 +45,9 @@ def test_generate_streams_progress_and_saves_best(
 
     clip = client.get(f"/api/clips/{result['clip_id']}").json()
     version = clip["current_version"]
-    assert (version["source"], version["seed"], version["score"]) == (
-        "model",
-        result["seed"],
-        result["score"],
-    )
+    assert (version["source"], version["seed"]) == ("model", result["seed"])
+    assert version["score"] == pytest.approx(result["score"], abs=1e-4)  # result is rounded
+    assert version["params"]["controls"]["harmony"] == "normal"
     assert version["params"]["request_seed"] == 1000
     assert all(28 <= n["p"] <= 55 and n["t"] % 120 == 0 for n in version["notes"])
 

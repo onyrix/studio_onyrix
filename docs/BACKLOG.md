@@ -86,9 +86,9 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | B-63 | Chord lane in the timeline: per-section grid editing with server validation | ✅ |
 | B-64 | Suggestion popovers: progression for the selected section, chord change on a bar | ✅ |
 | B-70 | Spike: what do prism's 13 `pitch_class_set` levels encode? Use per bar if possible | ⬜ |
-| B-71 | `postprocess.harmonic_snap` (role-aware, idempotent, property-tested) | ⬜ |
+| B-71 | `postprocess.harmonic_snap` (role-aware, idempotent, property-tested) | ✅ |
 | B-72 | Strict harmony mode: block generation aligned to chord changes, per-block `pitch_mask` | ⬜ |
-| B-73 | Per-role scorer weights; N=8 default on `yellow_medium` | ⬜ |
+| B-73 | Per-role scorer weights ✅ (bass/chords/pad weigh CT more); N=8 default on `yellow_medium` ⬜ | 🟡 |
 | B-74 | Benchmark CT / S / latency per role × mode (raw, snap, strict, strict+snap) | ⬜ |
 | B-80 | `core/intent.GenerationIntent` + clamping | ⬜ |
 | B-81 | `KeywordInterpreter` (it/en) and `OllamaInterpreter` (stdlib HTTP, JSON schema, fallback) | ⬜ |

@@ -17,7 +17,7 @@ from typing import Any, Protocol
 
 from app.core import drums
 from app.core.model import Note, Role
-from app.core.postprocess import postprocess
+from app.core.postprocess import harmonic_snap, postprocess
 from app.core.scorer import (
     ScoreBreakdown,
     ScoringContext,
@@ -179,8 +179,22 @@ def scoring_context(spec: GenerationSpec) -> ScoringContext:
     )
 
 
+def finalize(notes: tuple[Note, ...], spec: GenerationSpec) -> tuple[Note, ...]:
+    """Harmonic snap (CLAUDE.md 6.8) on post-processed notes, then post-process again to drop
+    the duplicates a move may create."""
+    clip_ticks = bars_to_ticks(spec.bars, spec.ts)
+    snapped = harmonic_snap(
+        notes, spec.chords, spec.target_spec, clip_ticks, spec.ts, level=spec.harmony
+    )
+    return postprocess(snapped, spec.target_spec, clip_ticks)
+
+
 def rank_candidates(spec: GenerationSpec, raw: list[RawCandidate]) -> list[ScoredCandidate]:
-    """Post-process, filter and score; best first, rejected candidates last."""
+    """Post-process, score, snap to the harmony and filter; best first, rejected last.
+
+    The score is computed before the harmonic snap so it still ranks how well the model itself
+    followed the chords; the kept notes are the snapped ones.
+    """
     clip_ticks = bars_to_ticks(spec.bars, spec.ts)
     ctx = scoring_context(spec)
     scored = []
@@ -188,12 +202,13 @@ def rank_candidates(spec: GenerationSpec, raw: list[RawCandidate]) -> list[Score
         if candidate.error:
             scored.append(ScoredCandidate(candidate.seed, (), None, f"error: {candidate.error}"))
             continue
-        notes = postprocess(candidate.notes, spec.target_spec, clip_ticks)
+        clean = postprocess(candidate.notes, spec.target_spec, clip_ticks)
+        notes = finalize(clean, spec)
         violation = hard_constraint_violation(notes, ctx)
         if violation:
             scored.append(ScoredCandidate(candidate.seed, notes, None, violation))
         else:
-            scored.append(ScoredCandidate(candidate.seed, notes, score_notes(notes, ctx)))
+            scored.append(ScoredCandidate(candidate.seed, notes, score_notes(clean, ctx)))
     # Higher score first; ties broken by seed so the order is reproducible.
     return sorted(scored, key=lambda c: (c.rejected is not None, -c.score, c.seed))
 

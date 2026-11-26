@@ -91,3 +91,15 @@ def test_progress_reports_each_candidate() -> None:
         FakeEngine(), spec(n_candidates=3), progress=lambda e, d: events.append((e, d))
     )
     assert [e for e, _ in events] == ["sampling", "candidate", "candidate", "candidate"]
+
+
+def test_rank_scores_before_the_harmonic_snap_and_keeps_snapped_notes() -> None:
+    off_chord = tuple(Note(b * 480, 34, 480, 100) for b in range(8))  # A# on every beat
+    ranked = rank_candidates(spec(), [RawCandidate(1, off_chord)])
+    best = ranked[0]
+    assert best.breakdown is not None and best.breakdown.ct == 0.0  # the model missed the chords
+    chords = spec().chords
+    assert all(n.p % 12 in chords[n.t // 1920].pitch_class_set for n in best.notes)  # fixed
+
+    raw = rank_candidates(spec(harmony="off"), [RawCandidate(1, off_chord)])[0]
+    assert {n.p for n in raw.notes} == {34}

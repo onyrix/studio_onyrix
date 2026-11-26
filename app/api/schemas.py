@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -170,6 +170,7 @@ class ClipPatch(BaseModel):
 
 class GenerateControls(BaseModel):
     density: int | None = Field(default=None, ge=0, le=9)
+    harmony: Literal["off", "light", "normal", "strict"] = "normal"
     temperature: float = Field(default=1.0, gt=0, le=2)
     top_p: float = Field(default=0.95, gt=0, le=1)
 

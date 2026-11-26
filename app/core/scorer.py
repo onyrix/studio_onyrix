@@ -15,7 +15,14 @@ from app.core.roles import RoleSpec
 from app.core.timebase import FOUR_FOUR, PPQ, TimeSignature, bar_ticks
 
 DEFAULT_WEIGHTS: dict[str, float] = {"ct": 0.4, "r": 0.2, "d": 0.2, "o": 0.1, "k": 0.1}
-ROLE_WEIGHTS: dict[Role, dict[str, float]] = {role: DEFAULT_WEIGHTS for role in Role}
+# Harmonic roles weigh chord tones more (D3, CLAUDE.md 6.8); K only means something for bass.
+_HARMONIC: dict[str, float] = {"ct": 0.5, "r": 0.2, "d": 0.15, "o": 0.15, "k": 0.0}
+ROLE_WEIGHTS: dict[Role, dict[str, float]] = {
+    **{role: DEFAULT_WEIGHTS for role in Role},
+    Role.BASS: {"ct": 0.45, "r": 0.15, "d": 0.15, "o": 0.1, "k": 0.15},
+    Role.CHORDS: _HARMONIC,
+    Role.PAD: _HARMONIC,
+}
 
 
 @dataclass(frozen=True)

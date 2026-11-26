@@ -91,6 +91,7 @@ def build_spec(
         seed=seed,
         temperature=body.controls.temperature,
         top_p=body.controls.top_p,
+        harmony=body.controls.harmony,
     )
     return spec, section, track
 
