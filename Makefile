@@ -29,7 +29,7 @@ lint:
 	$(PY) -m mypy
 
 fetch-models:
-	@echo "fetch-models: implemented in M1"
+	$(PY) scripts/fetch_models.py
 
 bench:
 	$(PY) scripts/benchmark_models.py

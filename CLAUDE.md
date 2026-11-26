@@ -257,6 +257,7 @@ Work milestone by milestone. Do not start M(n+1) before M(n) acceptance passes.
 
 ## 11. Known risks and open items
 
+- **Gated weights.** `Metacreation/MIDI-GPT` on Hugging Face is gated: the licence must be accepted on the Hub and the machine authenticated (`hf auth login` or `HF_TOKEN`) before the first download. Never commit or log the token. See `docs/midigpt-notes.md`.
 - **Weights licence.** Code is MIT; the Hugging Face model card lists CC-BY-NC-4.0 for the weights while the paper mentions Open RAIL-M. Personal use is fine. Do not redistribute weights, do not bundle them in installers, do not add any commercial feature without re-checking the licence.
 - **Checkpoint maturity.** `prism_medium` and `expressive_medium` were published as work-in-progress checkpoints. Keep `yellow_medium` working as the stable fallback at all times.
 - **Attribute and field names** of `midigpt` are verified at runtime (M1), not assumed.

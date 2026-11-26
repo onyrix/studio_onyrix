@@ -31,6 +31,6 @@ switch ($Target) {
         Invoke-Step $Py @("-m", "ruff", "format", "--check", ".")
         Invoke-Step $Py @("-m", "mypy")
     }
-    "fetch-models" { Write-Host "fetch-models: implemented in M1" }
+    "fetch-models" { Invoke-Step $Py @("scripts/fetch_models.py") }
     "bench" { Invoke-Step $Py @("scripts/benchmark_models.py") }
 }
