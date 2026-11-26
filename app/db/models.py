@@ -107,6 +107,8 @@ class Section(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(200))
     bars: Mapped[int] = mapped_column(Integer)
+    # One {root, quality, pitch_class_set} per bar; empty = cycle the project's chord_grid.
+    chord_grid: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 
     project: Mapped[Project] = relationship(back_populates="sections")
     slots: Mapped[list[SectionSlot]] = relationship(

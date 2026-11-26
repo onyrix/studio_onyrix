@@ -38,6 +38,33 @@ def test_migrates_from_empty(engine: Engine) -> None:
     assert "alembic_version" in tables
 
 
+def test_0002_upgrades_existing_sections(tmp_path: Path) -> None:
+    from alembic import command
+    from sqlalchemy import text
+
+    from app.db.migrate import alembic_config
+
+    url = f"sqlite:///{(tmp_path / 'old.db').as_posix()}"
+    cfg = alembic_config(url)
+    command.upgrade(cfg, "0001")
+    eng = make_engine(url)
+    with eng.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO projects (id, name, bpm, ts_numerator, ts_denominator, key_tonic, "
+                "key_mode, genre, chord_grid, created_at, updated_at) VALUES "
+                "(1, 'p', 120, 4, 4, 0, 'major', '', '[]', '2026-01-01', '2026-01-01')"
+            )
+        )
+        conn.execute(
+            text("INSERT INTO sections (id, project_id, name, bars) VALUES (1, 1, 'A', 4)")
+        )
+    command.upgrade(cfg, "head")
+    with eng.connect() as conn:
+        assert conn.execute(text("SELECT chord_grid FROM sections")).scalar_one() == "[]"
+    eng.dispose()
+
+
 def test_migration_matches_models(engine: Engine) -> None:
     with engine.connect() as conn:
         diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)

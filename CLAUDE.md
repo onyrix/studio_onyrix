@@ -120,9 +120,9 @@ Always run `make lint` and `make test` before declaring a task done.
 - **Track**: project, role (`drums | bass | chords | pad | lead | other`), GM program, name, mute/solo.
 - **Clip**: belongs to a track; `bars`; `notes[]` as `{t, p, d, v}` (tick, pitch, duration ticks, velocity 1–127); `locked` flag.
 - **ClipVersion**: history of a clip's content with `seed`, `source` (`model | manual | import`), `score`, `params` (JSON), `created_at`. A clip points to its current version.
-- **Section**: name, `bars`, `slots{track_id -> clip_id}`.
+- **Section**: name, `bars`, `chord_grid` (one entry per bar; empty = cycle the project's `chord_grid`), `slots{track_id -> clip_id}`.
 - **Arrangement**: ordered list of `SectionInstance(section_id)`. The same `Section` can appear several times; editing it changes every instance.
-- **chord_grid**: one entry per bar of each section: `{root, quality, pitch_class_set}`.
+- **chord_grid**: one entry per bar of each section: `{root, quality, pitch_class_set}`, stored on the Section; the Project's `chord_grid` is the default progression, cycled over sections without their own grid.
 
 ### 5.3 Operations (must stay simple)
 
