@@ -1,2 +1,0 @@
-PROJECT_NAME = "Studio Onyrix"
-PROJECT_VERSION = "0.70"
