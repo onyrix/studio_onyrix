@@ -103,12 +103,18 @@ def generate_bass(engine: Any, score: Any, seed: int) -> tuple[Any, list[dict[st
     started = time.perf_counter()
     candidates = engine.session(score, request).run_variations()
     elapsed = time.perf_counter() - started
+    # Decoded scores come back at the tokenizer's output resolution (not the input's): resample.
+    for c in candidates:
+        if c["score"] is not None:
+            c["raw_resolution"] = c["score"].resolution
+            c["score"] = c["score"].resample(PPQ)
     best = next(c["score"] for c in candidates if c["score"] is not None)
     return best, candidates, elapsed
 
 
 def bass_notes(score: Any) -> list[dict[str, int]]:
     """Flatten track 1 to clip-relative {t, p, d, v} (onsets are relative to their bar)."""
+    assert score.resolution == PPQ, f"expected PPQ {PPQ}, got {score.resolution}"
     out = []
     bar_len = bar_ticks()
     for i, bar in enumerate(score.tracks[1].bars):
@@ -192,6 +198,7 @@ def main() -> None:
             {
                 "seed": c["seed"],
                 "error": c["error"],
+                "raw_resolution": c.get("raw_resolution"),
                 "check": check_bass(bass_notes(c["score"])) if c["score"] is not None else None,
             }
             for c in candidates

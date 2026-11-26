@@ -141,7 +141,8 @@ Default order inside a section: **drums → bass → chords/pad → lead**. Ever
 ### 6.2 Model integration (`gen/adapter.py`, `gen/engine.py`)
 
 - Load with `InferenceEngine.from_pretrained("prism_medium")`; fall back to `"yellow_medium"` if prism fails to load. Model name is a setting.
-- `prism_medium` supports windows of **4, 8, 12, 16 bars** and per-bar attributes (key, pitch range, pitch class set, genre, density, polyphony). `yellow_medium` supports **4, 8** bars and only density / polyphony / note duration (no key, no chords). `config.model_dim` must be a value from the model's `num_bars_map`.
+- `prism_medium` supports windows of **4, 8, 12, 16 bars**; track-level key, pitch range, silence proportion and note duration; bar-level pitch class set, polyphony and drum density; piece-level genre (18 labels, via `request.controls`). `yellow_medium` supports **4, 8** bars and only polyphony / note duration plus drum density (no key, no chords, no genre). Melodic density is not an attribute on either model. Verified in M1, see `docs/midigpt-notes.md`.
+- Decoded scores come back at resolution 1920 regardless of input: always `resample(480)` before use. `config.model_dim` must be a value from the model's `num_bars_map`.
 - **Do not hard-code attribute names or value ranges.** Read them at runtime (`GET /info` on the HTTP server, or `engine._analyzer.attribute_sizes()` / `attribute_value_labels()` in-process) and cache them. Map project concepts (density level, chord pitch classes) to the quantized levels the model reports.
 - Score conversion (project → midigpt `Score`): resolution 480, tempo in µs per quarter, per-bar time signature, GM `instrument`, `track_type` `melodic` or `drum`.
 - Infill uses `TrackPrompt(id, bars=[...])`; from-scratch uses `autoregressive=True`; `ignore=True` omits a track from context; per-bar overrides go in `bar_attributes` / `bar_controls`. Default `InferenceConfig(mask_mode="attention", temperature=1.0, top_p=0.95)`.

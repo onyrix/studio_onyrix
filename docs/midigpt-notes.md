@@ -1,28 +1,67 @@
 # midigpt notes (M1 spike)
 
-Verified against the installed package **midigpt 0.4.2** (Windows wheel `cp310-win_amd64`, torch 2.14.1 CPU) by reading its source and by round-trip probes. Runtime model findings (attribute names/levels per checkpoint) are **pending**: see *Status*.
+Verified against the installed package **midigpt 0.4.2** (Windows wheel `cp310-win_amd64`, torch 2.14.1 CPU) by reading its source, by round-trip probes, and by running `scripts/m1_spike.py` on both checkpoints (CPU, seed 1234).
 
-## Status
+## Status — M1 acceptance met
 
 | Item | State |
 |---|---|
 | Package install (`.[inference]`) on Windows / Python 3.10 | OK |
-| Python types (`Score`, `Track`, `Bar`, `Note`) | Verified (below) |
-| Inference API (`InferenceEngine`, `GenerationRequest`, `TrackPrompt`, `InferenceConfig`) | Verified from source (below) |
-| Score → `.mid` → Score round trip, tempo, PPQ, program | Verified with a probe |
-| Load `yellow_medium` / `prism_medium` | **Blocked: HF repo is gated** |
-| Per-model attributes, value labels, `num_bars_map`, genres | Pending (needs weights) |
-| 4-bar bass on a 4-chord grid → `.mid` (M1 acceptance) | Pending (needs weights) |
+| Python types and inference API | Verified (below) |
+| Load `yellow_medium` / `prism_medium` | OK (≈30 s first load incl. download, ≈3 s cached) |
+| Per-model attributes, windows, genres | Recorded (below) |
+| 4-bar bass on Am–F–C–G, 4 candidates → valid `.mid` (PPQ 480, tempo, GM programs) | OK for both models |
+| Same seed ⇒ same notes | OK for both models |
+| `make test-infer` | 4 passed |
 
 ### Gated weights
 
-`InferenceEngine.from_pretrained(name)` downloads from `Metacreation/MIDI-GPT` on Hugging Face, which is **gated**. One-time setup:
+`Metacreation/MIDI-GPT` on Hugging Face is **gated**. One-time setup: accept the licence at <https://huggingface.co/Metacreation/MIDI-GPT>, then `hf auth login` (or set `HF_TOKEN`). Once cached, `from_pretrained` falls back to the local copy when the Hub is unreachable.
 
-1. Accept the licence at <https://huggingface.co/Metacreation/MIDI-GPT> with a Hugging Face account.
-2. Authenticate: `.venv\Scripts\hf auth login` (or set `HF_TOKEN`).
-3. Re-run `python scripts/m1_spike.py` (writes `output/m1/report.json` and `.mid` files) and complete this document.
+## Runtime model facts
 
-Once cached, `from_pretrained` falls back to the local copy when the Hub is unreachable.
+| | `yellow_medium` | `prism_medium` |
+|---|---|---|
+| Windows (`num_bars_map`) | 4, 8 | 4, 8, 12, 16 |
+| Max context tokens | 2048 | 4096 |
+| Internal resolution | 12 ticks/quarter | 12 ticks/quarter |
+| Genres (`request.controls["genre"]`) | none | 18: asian, baroque, blues, christian, classical, country, dance-electronic, european, folk, hip-hop, jazz, latin, metal, pop, punk, renaissance, rock, soundtrack |
+| Switchable velocity / microtiming | no / no | no / no |
+| Generate 4 bars × 4 candidates (CPU) | ≈24 s | ≈8.5 s |
+
+Attributes (`attribute_sizes`, `attribute_levels`, `attribute_track_types`):
+
+| Model | Attribute | Levels | Scope | Tracks | Labels |
+|---|---|---|---|---|---|
+| yellow | `note_density` | 10 | track | drum | `sparsest (Q0)` … `densest (Q9)` |
+| yellow | `min_polyphony`, `max_polyphony` | 10 | track | melodic | `1 voice` … `10+ voices` |
+| yellow | `min_note_duration`, `max_note_duration` | 6 | track | melodic | `32nd` … `whole` |
+| prism | `key_signature` | 25 | track | melodic | (no labels) |
+| prism | `pitch_range` | 128 | track | melodic | (no labels) |
+| prism | `silence_proportion` | 10 | track | both | (no labels) |
+| prism | `min_note_duration`, `max_note_duration` | 6 | track | melodic | `32nd` … `whole` |
+| prism | `bar_note_density` | 10 | bar | drum | `sparsest (Q0)` … `densest (Q9)` |
+| prism | `bar_min_polyphony`, `bar_max_polyphony` | 10 | bar | melodic | `1 voice` … `10+ voices` |
+| prism | `pitch_class_set` | 13 | bar | melodic | (no labels) |
+
+Note: density is a **drum-only** attribute on both checkpoints; for melodic roles density can only be steered indirectly (polyphony, note duration, silence proportion) or via `rhythm_mask`.
+
+### Raw output quality (why post-processing and scoring are mandatory)
+
+Bass, 4 candidates each, before any post-processing (role range 28–55, 16th grid, chord tones on quarter-note onsets):
+
+| Model | Seed | Notes | In range | On 16th grid | Chord tones on beats |
+|---|---|---|---|---|---|
+| yellow | 1234 | 8 | 8/8 | 8/8 | 1/4 |
+| yellow | 1235 | 84 | 28/84 | 44/84 | 5/12 |
+| yellow | 1236 | 8 | 8/8 | 8/8 | 2/8 |
+| yellow | 1237 | 64 | 48/64 | 64/64 | 16/16 |
+| prism | 1234 | 8 | 8/8 | 8/8 | 2/4 |
+| prism | 1235 | 4 | 0/4 | 4/4 | 2/4 |
+| prism | 1236 | 16 | 16/16 | 16/16 | 4/8 |
+| prism | 1237 | 4 | 4/4 | 4/4 | 2/4 |
+
+Candidates vary wildly (4 to 84 notes, out-of-range and off-grid notes, very short durations of 40–80 ticks). This confirms CLAUDE.md rule 8: never use raw output; generate N candidates, post-process, score, keep the best. Harmonic guidance (`pitch_mask` / `pitch_class_set`) was **not** used in this spike.
 
 ## Types (`midigpt._types`, plain dataclasses)
 
@@ -55,6 +94,10 @@ Score.from_midi(path) / from_bytes(data) / to_midi(path) / resample(tpq) / to_di
 - Attribute registry names (which ones a checkpoint uses is pending): `note_density`, `onset_polyphony`, `pitch_range`, `key_signature`, `note_duration_dist`, `silence_proportion`, `pitch_class_set`, `note_density_quantile`, `polyphony_quantile`, `note_duration_quantile`, `tension`, `tension_drum`, `nomml`.
 
 ## Implications for M2
+
+- **Resolution:** decoded scores come back at **resolution 1920**, whatever the input resolution was. The adapter must call `score.resample(480)` on every result before converting to clip notes (`scripts/m1_spike.py` does this).
+- **Bar-relative onsets:** convert clip-relative ticks ↔ (bar index, onset within bar) in `adapter.py` via `core/timebase.py`.
+- **Model differences:** `prism_medium` supports key, pitch range, bar-level pitch class set and genre; `yellow_medium` only polyphony, note duration and drum density. Build controls from `attribute_sizes()` at runtime, never hard-coded.
 
 - `pitch_mask` with the bar's chord/scale pitch classes plus a `uniform` shape on the role range gives hard harmonic/range guidance even when the model has no chord attribute (relevant for `yellow_medium`). The post-processor and scorer remain the source of truth.
 - `num_candidates` + `run_variations()` can implement the N-candidate loop in one call; SSE note streaming then only works for N=1, so stream progress (not notes) for N>1.
