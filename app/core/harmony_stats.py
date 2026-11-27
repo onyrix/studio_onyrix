@@ -285,7 +285,9 @@ def _merge_repeats(numerals: Sequence[str]) -> list[str]:
     return out
 
 
-SURPRISE_LOW, SURPRISE_HIGH = 1.5, 6.0  # bits mapped to 0 and 1 by `surprise_level`
+# Bits mapped to 0 and 1 by `surprise_level`. Calibrated on the Chordonomicon index
+# (2026-11-27): I V vi IV ~1.4 bits, library quartiles 1.6 / 2.4 / 2.9, neapolitan iv bII V 5.5.
+SURPRISE_LOW, SURPRISE_HIGH = 1.3, 5.5
 
 
 def surprise_level(bits: float) -> float:
