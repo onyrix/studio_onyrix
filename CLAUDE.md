@@ -222,6 +222,9 @@ GET    /harmony/diatonic?tonic=&mode=       # diatonic chords with roman numeral
 POST   /harmony/suggest                     # progressions for a section (rules; LLM when available and prompted)
 POST   /harmony/next                        # suggested chord changes after/instead of a chord
 POST   /harmony/parse                       # validate progression text, canonical form + events
+GET    /harmony/audition.mid?project_id=&text= # a progression as voiced block chords + root bass (browser audition)
+GET    /harmony/kits?project_id=&moods=     # song kits (core/library.py) realized in the project key
+POST   /harmony/kits/apply                  # write a kit into sections of matching kind, create missing ones
 POST   /projects/{id}/plan                  # song plan preview from a prompt (no writes)
 POST   /projects/{id}/plan/apply            # create sections, arrangement and tracks from a plan
 GET    /llm/status                          # Ollama reachable? model name

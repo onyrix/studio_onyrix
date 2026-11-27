@@ -1,6 +1,7 @@
 // Header: project picker and buttons that open the (static) dialogs in index.html.
 
 import { openProject, showError } from "../lib/actions.js";
+import { openKitsDialog } from "./kits-dialog.js";
 import { h } from "../lib/dom.js";
 import { t } from "../lib/i18n.js";
 
@@ -48,6 +49,15 @@ export function renderProjectBar(root, state) {
       "button",
       { type: "button", disabled: !hasProject, onclick: () => openDialog("dialog-section") },
       t("section.add"),
+    ),
+    h(
+      "button",
+      {
+        type: "button",
+        disabled: !hasProject,
+        onclick: () => openKitsDialog().catch(showError),
+      },
+      t("kits.open"),
     ),
   );
 }

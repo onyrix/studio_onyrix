@@ -2,7 +2,7 @@
 
 import { api, followJob, uploadSoundfont as uploadBank } from "./api.js";
 import { t } from "./i18n.js";
-import { resetBank } from "./player.js";
+import { playOnce, resetBank } from "./player.js";
 import { getState, jobKey, setState } from "./store.js";
 
 /** @param {unknown} error */
@@ -73,6 +73,30 @@ export async function addSection(data) {
   const project = getState().project;
   if (!project) return;
   await api.addSection(project.id, data);
+  await refreshProject();
+}
+
+/**
+ * Listen to a progression (chord symbols, progression syntax) as block chords.
+ * @param {string} text
+ */
+export async function audition(text) {
+  const { project, soundfonts } = getState();
+  if (!project || !text.trim()) return;
+  const bankId = soundfonts?.active;
+  if (!bankId) {
+    setState({ message: t("sound.needBank") });
+    return;
+  }
+  const query = new URLSearchParams({ project_id: String(project.id), text });
+  await playOnce(`/api/harmony/audition.mid?${query}`, bankId);
+}
+
+/** Apply a song kit to the open project. @param {string} kitId @param {Record<string, string>} names */
+export async function applyKit(kitId, names) {
+  const project = getState().project;
+  if (!project) return;
+  await api.applyKit({ project_id: project.id, kit_id: kitId, create_missing: true, names });
   await refreshProject();
 }
 

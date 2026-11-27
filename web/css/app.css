@@ -722,3 +722,81 @@ dialog.wide {
 .progression {
   width: 100%;
 }
+
+.progression-row {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.listen {
+  justify-content: center;
+  min-width: 32px;
+}
+
+.chips.moods {
+  gap: 4px;
+}
+
+/* Song kits dialog */
+.kits {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kit {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.kit-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.kit-head small {
+  color: var(--muted);
+}
+
+.kit-head button {
+  margin-left: auto;
+}
+
+.kit-parts {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kit-parts th {
+  padding: 2px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.kit-parts td {
+  padding: 2px 0;
+}
+
+.kit-parts td:first-child {
+  width: 40px;
+}
+
+.kit-parts th {
+  width: 120px;
+}
+
+.kit-parts td small {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}

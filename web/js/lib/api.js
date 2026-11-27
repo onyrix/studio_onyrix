@@ -57,6 +57,12 @@ export const api = {
   harmonySuggest: (/** @type {object} */ data) => request("POST", "/harmony/suggest", data),
   harmonyNext: (/** @type {object} */ data) => request("POST", "/harmony/next", data),
   harmonyParse: (/** @type {object} */ data) => request("POST", "/harmony/parse", data),
+  kits: (/** @type {number} */ projectId, /** @type {string[]} */ moods) =>
+    request(
+      "GET",
+      `/harmony/kits?${new URLSearchParams([["project_id", String(projectId)], ...moods.map((m) => ["moods", m])])}`,
+    ),
+  applyKit: (/** @type {object} */ data) => request("POST", "/harmony/kits/apply", data),
   generate: (/** @type {object} */ data) => request("POST", "/generate", data),
   cancelJob: (/** @type {string} */ id) => request("POST", `/jobs/${id}/cancel`),
   soundfonts: () => request("GET", "/soundfonts"),

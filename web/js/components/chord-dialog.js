@@ -3,7 +3,7 @@
 // selected chord. Parsing and spelling happen on the server (core/progression.py is the tested
 // reference); `eventsText` below mirrors its `progression_text`.
 
-import { patchSection, showError } from "../lib/actions.js";
+import { audition, patchSection, showError } from "../lib/actions.js";
 import { api } from "../lib/api.js";
 import { h } from "../lib/dom.js";
 import { t } from "../lib/i18n.js";
@@ -14,11 +14,29 @@ import { getState } from "../lib/store.js";
  * @typedef {{symbol: string, beats: number}} Event
  * @typedef {{
  *   sectionId: number, selected: number, events: Event[], inherited: boolean,
- *   diatonic: ChordInfo[], progressions: Array<{chords: ChordInfo[], numerals: string}>,
+ *   diatonic: ChordInfo[],
+ *   progressions: Array<{id: string, chords: Array<ChordInfo & {beats: number}>, chord_text: string, numerals: string, moods: string[]}>,
+ *   moods: string[],
  *   next: Array<ChordInfo & {kind: string}>, kind: string, error: string,
  *   typed: string | null,
  * }} Local
  */
+
+/** Mood tags of the progression library (mirror of core/library.py MOODS). */
+export const MOODS = [
+  "bright",
+  "uplifting",
+  "melancholic",
+  "nostalgic",
+  "dreamy",
+  "romantic",
+  "dark",
+  "epic",
+  "tense",
+  "mysterious",
+  "groovy",
+  "calm",
+];
 
 /** @type {Local | null} */
 let local = null;
@@ -81,6 +99,7 @@ export async function openChordDialog(sectionId, eventIndex) {
     inherited,
     diatonic: [],
     progressions: [],
+    moods: [],
     next: [],
     kind: "",
     error: "",
@@ -89,19 +108,50 @@ export async function openChordDialog(sectionId, eventIndex) {
   render();
   if (!dialog().open) dialog().showModal();
   try {
-    const [diatonic, suggested] = await Promise.all([
-      api.harmonyDiatonic(project.key_tonic, project.key_mode),
-      api.harmonySuggest({ project_id: project.id, section_id: sectionId }),
-    ]);
+    const diatonic = await api.harmonyDiatonic(project.key_tonic, project.key_mode);
     if (!local || local.sectionId !== sectionId) return;
     local.diatonic = diatonic;
+    render();
+  } catch (e) {
+    showError(e);
+  }
+  await Promise.all([loadSuggestions(), loadNext()]);
+}
+
+/** Library progressions for this section, filtered by the selected moods. */
+async function loadSuggestions() {
+  const project = getState().project;
+  if (!local || !project) return;
+  const { sectionId, moods } = local;
+  try {
+    const suggested = await api.harmonySuggest({
+      project_id: project.id,
+      section_id: sectionId,
+      moods,
+      n: 12,
+    });
+    if (!local || local.sectionId !== sectionId || local.moods !== moods) return;
     local.progressions = suggested.progressions;
     local.kind = suggested.section_kind;
     render();
   } catch (e) {
     showError(e);
   }
-  await loadNext();
+}
+
+/** @param {string} mood */
+function toggleMood(mood) {
+  if (!local) return;
+  local.moods = local.moods.includes(mood)
+    ? local.moods.filter((m) => m !== mood)
+    : [...local.moods, mood];
+  render();
+  loadSuggestions();
+}
+
+/** @param {string} text */
+function listen(text) {
+  audition(text).catch(showError);
 }
 
 /** Chord changes suggested after the chord preceding the selected one (cyclic). */
@@ -328,31 +378,55 @@ function render() {
         : t("chords.progressions"),
     ),
     h(
-      "ul.progressions",
-      null,
-      ...state.progressions.map((p) =>
+      "div.chips.moods",
+      { role: "group", "aria-label": t("chords.moods") },
+      ...MOODS.map((mood) =>
         h(
-          "li",
-          null,
-          h(
-            "button.progression",
-            {
-              type: "button",
-              onclick: () =>
-                update((events) =>
-                  events.splice(0, events.length, ...p.chords.map((c) => ({ symbol: c.symbol, beats: beatsPerBar() }))),
-                ),
-            },
-            h("strong", null, p.chords.map((c) => c.symbol).join(" ")),
-            h("small", null, p.numerals),
-          ),
+          `button.small.mood${state.moods.includes(mood) ? ".primary" : ""}`,
+          { type: "button", "aria-pressed": String(state.moods.includes(mood)), onclick: () => toggleMood(mood) },
+          t(`mood.${mood}`),
         ),
       ),
     ),
+    state.progressions.length
+      ? h(
+          "ul.progressions",
+          null,
+          ...state.progressions.map((p) =>
+            h(
+              "li.progression-row",
+              null,
+              h(
+                "button.small.listen",
+                { type: "button", title: t("chords.listen"), "aria-label": t("chords.listen"), onclick: () => listen(p.chord_text) },
+                "▶",
+              ),
+              h(
+                "button.progression",
+                {
+                  type: "button",
+                  title: t("chords.use"),
+                  onclick: () =>
+                    update((events) =>
+                      events.splice(0, events.length, ...p.chords.map((c) => ({ symbol: c.symbol, beats: c.beats }))),
+                    ),
+                },
+                h("strong", null, p.chord_text),
+                h("small", null, `${p.numerals} · ${p.moods.map((m) => t(`mood.${m}`)).join(", ")}`),
+              ),
+            ),
+          ),
+        )
+      : h("p.muted", null, t("chords.noMatch")),
     h("p.form-error", { role: "alert", hidden: !state.error }, state.error),
     h(
       "footer",
       null,
+      h(
+        "button.listen-current",
+        { type: "button", disabled: !state.events.length, onclick: () => listen(state.typed ?? eventsText(state.events)) },
+        `▶ ${t("chords.listenCurrent")}`,
+      ),
       h("button", { type: "button", onclick: () => save(true) }, t("chords.useProject")),
       h("button", { type: "button", onclick: () => dialog().close() }, t("form.close")),
       h("button.primary", { type: "button", onclick: () => save(false) }, t("form.save")),

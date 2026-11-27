@@ -99,19 +99,41 @@ export function applyMutes(tracks) {
  * @returns {Promise<void>}
  */
 export async function play(project, instanceIndexes, options) {
+  const start = Math.min(...instanceIndexes);
+  const end = Math.max(...instanceIndexes) + 1;
+  await playUrl(`/api/export/project/${project.id}.mid?start=${start}&end=${end}&loop=true`, options, () =>
+    applyMutes([...project.tracks].sort((a, b) => a.position - b.position)),
+  );
+}
+
+/**
+ * Play a server-made MIDI file once (e.g. a chord progression audition), all channels audible.
+ * @param {string} url
+ * @param {string} bankId
+ */
+export async function playOnce(url, bankId) {
+  await playUrl(url, { loop: false, bankId }, () => {
+    for (let channel = 0; channel < 16; channel++) {
+      synth.midiChannels[channel]?.setSystemParameter("isMuted", false);
+    }
+  });
+}
+
+/**
+ * @param {string} url
+ * @param {{loop: boolean, bankId: string}} options
+ * @param {() => void} setupChannels  runs after loading, before playing
+ */
+async function playUrl(url, options, setupChannels) {
   await ensureSynth();
   await ensureBank(options.bankId);
   stop();
-  const start = Math.min(...instanceIndexes);
-  const end = Math.max(...instanceIndexes) + 1;
-  const response = await fetch(
-    `/api/export/project/${project.id}.mid?start=${start}&end=${end}&loop=true`,
-  );
+  const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const binary = await response.arrayBuffer();
   sequencer.loopCount = options.loop ? Infinity : 0;
-  sequencer.loadNewSongList([{ binary, fileName: `${project.name}.mid` }]);
-  applyMutes([...project.tracks].sort((a, b) => a.position - b.position));
+  sequencer.loadNewSongList([{ binary, fileName: "onyrix.mid" }]);
+  setupChannels();
   sequencer.currentTime = 0;
   sequencer.play();
   playing = true;
