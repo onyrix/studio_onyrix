@@ -8,6 +8,7 @@ import { api } from "../lib/api.js";
 import { h } from "../lib/dom.js";
 import { t } from "../lib/i18n.js";
 import { getState } from "../lib/store.js";
+import { explorerPanel, initExplorer, loadExplorer, meter, refreshInfo } from "./explorer.js";
 
 /**
  * @typedef {{symbol: string, numeral: string}} ChordInfo
@@ -15,7 +16,7 @@ import { getState } from "../lib/store.js";
  * @typedef {{
  *   sectionId: number, selected: number, events: Event[], inherited: boolean,
  *   diatonic: ChordInfo[],
- *   progressions: Array<{id: string, chords: Array<ChordInfo & {beats: number}>, chord_text: string, numerals: string, moods: string[]}>,
+ *   progressions: Array<{id: string, chords: Array<ChordInfo & {beats: number}>, chord_text: string, numerals: string, moods: string[], surprise_level: number}>,
  *   moods: string[],
  *   next: Array<ChordInfo & {kind: string}>, kind: string, error: string,
  *   typed: string | null,
@@ -105,8 +106,10 @@ export async function openChordDialog(sectionId, eventIndex) {
     error: "",
     typed: null,
   };
+  initExplorer(render);
   render();
   if (!dialog().open) dialog().showModal();
+  loadExplorer();
   try {
     const diatonic = await api.harmonyDiatonic(project.key_tonic, project.key_mode);
     if (!local || local.sectionId !== sectionId) return;
@@ -366,6 +369,20 @@ function render() {
         section: target.bars,
       }),
     ),
+    explorerPanel({
+      text: state.typed ?? eventsText(state.events),
+      selected: state.selected,
+      selectedSymbol: state.events[state.selected]?.symbol ?? "",
+      sectionId: state.sectionId,
+      apply: (events) =>
+        update((current) => {
+          current.splice(0, current.length, ...events);
+        }),
+      onError: (message) => {
+        state.error = message;
+        render();
+      },
+    }),
     h("h3", null, t("chords.next", { n: state.selected + 1 })),
     h("div.chips", null, ...state.next.map((c) => chip(c, t(`chords.kind.${c.kind}`)))),
     h("h3", null, t("chords.diatonic")),
@@ -412,7 +429,12 @@ function render() {
                     ),
                 },
                 h("strong", null, p.chord_text),
-                h("small", null, `${p.numerals} · ${p.moods.map((m) => t(`mood.${m}`)).join(", ")}`),
+                h(
+                  "small",
+                  null,
+                  `${p.numerals} · ${p.moods.map((m) => t(`mood.${m}`)).join(", ")} `,
+                  meter(p.surprise_level),
+                ),
               ),
             ),
           ),
@@ -432,4 +454,5 @@ function render() {
       h("button.primary", { type: "button", onclick: () => save(false) }, t("form.save")),
     ),
   );
+  if (state.events.length) refreshInfo(state.typed ?? eventsText(state.events), state.sectionId);
 }

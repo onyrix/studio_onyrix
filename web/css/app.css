@@ -800,3 +800,87 @@ dialog.wide {
   color: var(--muted);
   font-size: 11px;
 }
+
+/* Harmonic explorer */
+.explorer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.explorer summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.explorer h4 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.explore-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+label.inline {
+  display: inline-flex;
+  flex: 1 1 260px;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+label.inline input[type="range"] {
+  flex: 1;
+}
+
+.current-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+
+.meter-track {
+  display: inline-block;
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok), var(--accent), #d4a017, var(--error));
+  background-size: 64px 100%;
+}
+
+.corpus-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.corpus-line small {
+  flex-basis: 100%;
+}

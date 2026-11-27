@@ -42,8 +42,8 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 |---|---|---|
 | B-55 | Harmonic rhythm: chord events with `beats` (no migration: JSON field, no `beats` = one bar), text syntax `C*2 (Am F) G:3 %`, tick timeline for generator / snap / scorer, chord lane with proportional widths, event editor (duration, split, insert, delete) | ✅ |
 | B-56 | Curated library (`core/library.py`: 45 progressions, 12 song kits, roman numerals + harmonic rhythm, tags kind / genre / mood / energy), planner on top of it, voice-led audition (`/harmony/audition.mid`), mood filters + ▶ in the chord dialog, "Kit armonici" dialog that fills or creates the song form. Audio checked offline only: **listen in a real browser pending** | ✅ |
-| B-57 | Optional corpus import into `data/` (git-ignored, never bundled): Chordonomicon / ChoCo → roman numerals by section → n-gram statistics; search by pattern | ⬜ |
-| B-58 | Generator + transformation operators (substitutions, borrowed chords, chromatic mediants, modulation for the last chorus, pedal, deceptive cadence) with "audacity" control and a surprise meter | ⬜ |
+| B-57 | On-demand corpus import (Chordonomicon, CC BY-NC 4.0, attribution in the UI) into git-ignored `data/corpus`: key estimation per song, sections → reduced numerals, uni/bi/trigram + loop statistics per mode × kind × genre, gzip index only (CSV deleted); library statistics as offline fallback; `make fetch-corpus`; UI download / progress / remove | ✅ |
+| B-58 | 14 operators (chord: relative, borrow, tritone sub, secondary dominant, chromatic mediant, sus resolve, passing dim7, deceptive; progression: sevenths, tonic pedal, negative harmony, double / half time, step up), statistics generator with audacity slider, surprise meter on current / library / generated progressions; "Esplora e trasforma" panel | ✅ |
 | B-59 | Prompt → harmonic parameters (Ollama, keyword fallback) → ranked candidates with an explanation | ⬜ |
 
 ## P1 — next up
