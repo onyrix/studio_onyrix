@@ -18,6 +18,8 @@ from app.core.harmony import (
     suggest_next,
 )
 from app.core.model import ChordSlot, Key, Mode
+from app.core.progression import parse_progression, progression_text
+from app.core.timebase import TimeSignature
 from app.db.models import Project, Section
 from app.gen.planner import SECTION_KINDS, RuleBasedPlanner, kind_from_name, normalize_kind
 
@@ -59,6 +61,20 @@ class NextRequest(BaseModel):
 
 class NextChordOut(ChordOut):
     kind: str
+
+
+class ParseRequest(BaseModel):
+    project_id: int
+    text: str = Field(max_length=4000)
+
+
+class EventOut(ChordOut):
+    beats: int  # always explicit here (a whole bar = the time signature numerator)
+
+
+class ParseOut(BaseModel):
+    chord_text: str
+    events: list[EventOut]
 
 
 def chord_out(chord: ChordSlot, key: Key) -> dict[str, Any]:
@@ -119,3 +135,19 @@ def next_chords(body: NextRequest, db: DbSession) -> list[dict[str, Any]]:
         raise HTTPException(422, str(exc)) from exc
     key = project_key(project)
     return [{**chord_out(s.chord, key), "kind": s.kind} for s in suggest_next(prev, key)]
+
+
+@router.post("/parse", response_model=ParseOut)
+def parse(body: ParseRequest, db: DbSession) -> dict[str, Any]:
+    """Validate progression text (core.progression syntax) and return its canonical form."""
+    project = get_or_404(db, Project, body.project_id)
+    ts = TimeSignature(project.ts_numerator, project.ts_denominator)
+    try:
+        events = parse_progression(body.text, ts)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    key = project_key(project)
+    return {
+        "chord_text": progression_text(events, key, ts),
+        "events": [{**chord_out(e.chord, key), "beats": e.beats or ts.numerator} for e in events],
+    }

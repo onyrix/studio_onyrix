@@ -656,27 +656,36 @@ dialog.wide {
 }
 
 /* Chord dialog */
-.chord-bars {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+.chord-events {
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
-.chord-bar {
+.chord-event {
+  flex: 1 1 0;
+  min-width: 56px;
   flex-direction: column;
   align-items: flex-start;
   gap: 0;
   padding: 4px 6px;
 }
 
-.chord-bar.selected {
+.chord-event.selected {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
 
-.chord-bar.inherited span {
+.chord-event.inherited span {
   color: var(--muted);
   font-style: italic;
+}
+
+.chord-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
 }
 
 .chips {
@@ -695,7 +704,7 @@ dialog.wide {
 
 .chip small,
 .progression small,
-.chord-bar small {
+.chord-event small {
   color: var(--muted);
   font-size: 10px;
   font-weight: 400;

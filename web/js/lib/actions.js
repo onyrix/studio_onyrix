@@ -39,14 +39,6 @@ export async function openProject(id) {
   setState({ project, clips, selected: 0, jobs: {}, message: "" });
 }
 
-/** Split "Am F, C  G" into ["Am", "F", "C", "G"]. @param {string} text */
-export function parseChords(text) {
-  return text
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 /** @param {object} data */
 export async function createProject(data) {
   const project = await api.createProject(data);

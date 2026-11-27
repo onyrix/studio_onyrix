@@ -5,7 +5,6 @@ import {
   loadProjects,
   loadSoundfonts,
   openProject,
-  parseChords,
   showError,
   updateProject,
 } from "./lib/actions.js";
@@ -39,9 +38,6 @@ function fillOptions() {
   });
 }
 
-/** @param {Array<{symbol: string}>} grid */
-const chordsToText = (grid) => grid.map((c) => c.symbol).join(" ");
-
 /** @param {HTMLFormElement} form */
 function formValues(form) {
   return Object.fromEntries(new FormData(form).entries());
@@ -56,7 +52,7 @@ const SUBMIT = {
       key_tonic: Number(v.key_tonic),
       key_mode: v.key_mode,
       genre: v.genre,
-      chord_grid: parseChords(v.chords),
+      chord_grid: String(v.chords ?? ""),
     }),
   "update-project": (v) =>
     updateProject({
@@ -65,11 +61,11 @@ const SUBMIT = {
       key_tonic: Number(v.key_tonic),
       key_mode: v.key_mode,
       genre: v.genre,
-      chord_grid: parseChords(v.chords),
+      chord_grid: String(v.chords ?? ""),
     }),
   "add-track": (v) => addTrack({ role: v.role, name: v.name || undefined }),
   "add-section": (v) =>
-    addSection({ name: v.name, bars: Number(v.bars), chord_grid: parseChords(v.chords) }),
+    addSection({ name: v.name, bars: Number(v.bars), chord_grid: String(v.chords ?? "") }),
 };
 
 function wireDialogs() {
@@ -94,7 +90,7 @@ function wireDialogs() {
         field("key_tonic").value = String(project.key_tonic);
         field("key_mode").value = project.key_mode;
         field("genre").value = project.genre;
-        field("chords").value = chordsToText(project.chord_grid);
+        field("chords").value = project.chord_text;
       }
       if (dialog.id === "dialog-section") field("name").value = t("section.defaultName");
     });

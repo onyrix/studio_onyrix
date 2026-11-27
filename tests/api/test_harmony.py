@@ -68,3 +68,18 @@ def test_next(client: TestClient) -> None:
     assert {"functional", "borrowed"} <= {s["kind"] for s in out}
     bad = client.post("/api/harmony/next", json={"project_id": pid, "chord": "H7"})
     assert bad.status_code == 422
+
+
+def test_parse(client: TestClient) -> None:
+    pid = _project(client, key_tonic=5)
+    out = client.post("/api/harmony/parse", json={"project_id": pid, "text": "F:2 Bb:2 C*2"})
+    assert out.status_code == 200
+    body = out.json()
+    assert body["chord_text"] == "(F Bb) C*2"
+    assert [(e["symbol"], e["numeral"], e["beats"]) for e in body["events"]] == [
+        ("F", "I", 2),
+        ("Bb", "IV", 2),
+        ("C", "V", 8),
+    ]
+    bad = client.post("/api/harmony/parse", json={"project_id": pid, "text": "(F"})
+    assert bad.status_code == 422

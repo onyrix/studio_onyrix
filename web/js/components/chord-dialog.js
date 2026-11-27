@@ -1,7 +1,9 @@
-// Chord dialog: edit one section's chord grid, with suggested progressions, the key's diatonic
-// chords and chord changes for the selected bar. The server validates and spells the chords.
+// Chord dialog: edit one section's progression as chord events with durations (harmonic
+// rhythm), with suggested progressions, the key's diatonic chords and chord changes for the
+// selected chord. Parsing and spelling happen on the server (core/progression.py is the tested
+// reference); `eventsText` below mirrors its `progression_text`.
 
-import { patchSection, parseChords, showError } from "../lib/actions.js";
+import { patchSection, showError } from "../lib/actions.js";
 import { api } from "../lib/api.js";
 import { h } from "../lib/dom.js";
 import { t } from "../lib/i18n.js";
@@ -9,10 +11,12 @@ import { getState } from "../lib/store.js";
 
 /**
  * @typedef {{symbol: string, numeral: string}} ChordInfo
+ * @typedef {{symbol: string, beats: number}} Event
  * @typedef {{
- *   sectionId: number, bar: number, tokens: string[], inherited: boolean,
+ *   sectionId: number, selected: number, events: Event[], inherited: boolean,
  *   diatonic: ChordInfo[], progressions: Array<{chords: ChordInfo[], numerals: string}>,
  *   next: Array<ChordInfo & {kind: string}>, kind: string, error: string,
+ *   typed: string | null,
  * }} Local
  */
 
@@ -27,30 +31,60 @@ function section() {
   return project?.sections.find((s) => s.id === local?.sectionId);
 }
 
-/** Cycle `tokens` to exactly `bars` entries (the server cycles a shorter grid the same way). */
-function expand(/** @type {string[]} */ tokens, /** @type {number} */ bars) {
-  if (!tokens.length) return [];
-  return Array.from({ length: bars }, (_, i) => tokens[i % tokens.length]);
+function beatsPerBar() {
+  return getState().project?.ts_numerator ?? 4;
 }
 
-/** @param {number} sectionId @param {number} bar */
-export async function openChordDialog(sectionId, bar) {
+/** Canonical progression text (mirror of core/progression.py `progression_text`). @param {Event[]} events */
+export function eventsText(events) {
+  const perBar = beatsPerBar();
+  const out = [];
+  let i = 0;
+  while (i < events.length) {
+    const { symbol, beats } = events[i];
+    if (beats < perBar && perBar % beats === 0) {
+      const n = perBar / beats;
+      const group = events.slice(i, i + n);
+      if (group.length === n && group.every((e) => e.beats === beats)) {
+        out.push(`(${group.map((e) => e.symbol).join(" ")})`);
+        i += n;
+        continue;
+      }
+    }
+    if (beats === perBar) out.push(symbol);
+    else if (beats % perBar === 0) out.push(`${symbol}*${beats / perBar}`);
+    else out.push(`${symbol}:${beats}`);
+    i += 1;
+  }
+  return out.join(" ");
+}
+
+/** @param {Array<{symbol: string, beats?: number}>} grid @returns {Event[]} */
+function toEvents(grid) {
+  return grid.map((c) => ({ symbol: c.symbol, beats: c.beats ?? beatsPerBar() }));
+}
+
+/**
+ * @param {number} sectionId
+ * @param {number} eventIndex  index in the section's progression (not in the cycled timeline)
+ */
+export async function openChordDialog(sectionId, eventIndex) {
   const project = getState().project;
   const target = project?.sections.find((s) => s.id === sectionId);
   if (!project || !target) return;
-  const own = target.chord_grid.map((c) => c.symbol);
-  const inherited = !own.length;
-  const tokens = expand(inherited ? project.chord_grid.map((c) => c.symbol) : own, target.bars);
+  const inherited = !target.chord_grid.length;
+  const events = toEvents(inherited ? project.chord_grid : target.chord_grid);
   local = {
     sectionId,
-    bar,
-    tokens,
+    selected: Math.min(eventIndex, Math.max(0, events.length - 1)),
+    events,
     inherited,
     diatonic: [],
     progressions: [],
     next: [],
     kind: "",
     error: "",
+    typed: null,
   };
   render();
   if (!dialog().open) dialog().showModal();
@@ -70,16 +104,16 @@ export async function openChordDialog(sectionId, bar) {
   await loadNext();
 }
 
-/** Chord changes suggested after the chord preceding the selected bar (cyclic). */
+/** Chord changes suggested after the chord preceding the selected one (cyclic). */
 async function loadNext() {
   const project = getState().project;
-  if (!local || !project || !local.tokens.length) return;
-  const n = local.tokens.length;
-  const prev = local.tokens[(local.bar - 1 + n) % n];
-  const at = local.bar;
+  if (!local || !project || !local.events.length) return;
+  const n = local.events.length;
+  const at = local.selected;
+  const prev = local.events[(at - 1 + n) % n].symbol;
   try {
     const next = await api.harmonyNext({ project_id: project.id, chord: prev });
-    if (local && local.bar === at) {
+    if (local && local.selected === at) {
       local.next = next;
       render();
     }
@@ -91,40 +125,71 @@ async function loadNext() {
   }
 }
 
-/** Put a chord on the selected bar. @param {string} symbol */
-function setBar(symbol) {
-  const target = section();
-  if (!local || !target) return;
-  if (!local.tokens.length) local.tokens = Array(target.bars).fill(symbol);
-  local.tokens[local.bar] = symbol;
-  local.inherited = false;
-  local.bar = Math.min(local.bar + 1, target.bars - 1);
-  render();
-  loadNext();
-}
-
-/** @param {number} bar */
-function selectBar(bar) {
+/** Apply a change to the events, mark the grid as the section's own and re-render. @param {(events: Event[]) => void} change */
+function update(change) {
   if (!local) return;
-  local.bar = bar;
-  render();
-  loadNext();
-}
-
-/** @param {string[]} symbols */
-function useProgression(symbols) {
-  if (!local) return;
-  local.tokens = [...symbols];
+  change(local.events);
   local.inherited = false;
+  local.error = "";
+  local.typed = null;
+  local.selected = Math.max(0, Math.min(local.selected, local.events.length - 1));
+  render();
+}
+
+/** Put a chord on the selected event, keeping its duration, then move on. @param {string} symbol */
+function setChord(symbol) {
+  if (!local) return;
+  update((events) => {
+    if (!events.length) events.push({ symbol, beats: beatsPerBar() });
+    else events[/** @type {Local} */ (local).selected].symbol = symbol;
+  });
+  if (local.selected < local.events.length - 1) local.selected += 1;
   render();
   loadNext();
 }
 
-/** @param {string[] | null} grid  null = back to the project's progression */
-async function save(grid) {
+/** @param {number} index */
+function select(index) {
+  if (!local) return;
+  local.selected = index;
+  render();
+  loadNext();
+}
+
+/** Duration presets in beats for the current time signature. */
+function durations() {
+  const perBar = beatsPerBar();
+  /** @type {Array<[string, number]>} */
+  const out = [[t("chords.dur.beat"), 1]];
+  if (perBar % 2 === 0) out.push([t("chords.dur.half"), perBar / 2]);
+  out.push([t("chords.dur.bar"), perBar], [t("chords.dur.bars", { n: 2 }), 2 * perBar]);
+  out.push([t("chords.dur.bars", { n: 4 }), 4 * perBar]);
+  return out;
+}
+
+/** @param {string} text */
+async function parseText(text) {
+  const project = getState().project;
+  if (!local || !project) return;
+  try {
+    const parsed = await api.harmonyParse({ project_id: project.id, text });
+    update((events) => {
+      events.splice(0, events.length, ...parsed.events.map((/** @type {any} */ e) => ({ symbol: e.symbol, beats: e.beats })));
+    });
+  } catch (e) {
+    local.error = e instanceof Error ? e.message : String(e);
+    render();
+  }
+}
+
+/** @param {boolean} useProject  true = back to the project's progression */
+async function save(useProject) {
   if (!local) return;
   try {
-    await patchSection(local.sectionId, { chord_grid: grid ?? [] });
+    // Text typed but not parsed yet (Save clicked right after typing) goes to the server as is.
+    const text = local.typed ?? eventsText(local.events);
+    const grid = useProject || (local.inherited && local.typed === null) ? [] : text;
+    await patchSection(local.sectionId, { chord_grid: grid });
     dialog().close();
     local = null;
   } catch (e) {
@@ -137,10 +202,80 @@ async function save(grid) {
 function chip(chord, extra) {
   return h(
     "button.chip",
-    { type: "button", onclick: () => setBar(chord.symbol) },
+    { type: "button", onclick: () => setChord(chord.symbol) },
     h("strong", null, chord.symbol),
     h("small", null, extra ? `${chord.numeral} · ${extra}` : chord.numeral),
   );
+}
+
+/** Human duration label for an event. @param {number} beats */
+function durationLabel(beats) {
+  const perBar = beatsPerBar();
+  if (beats % perBar === 0) return t(beats === perBar ? "chords.dur.bar" : "chords.dur.bars", { n: beats / perBar });
+  return t("chords.dur.beats", { n: beats });
+}
+
+function eventEditor() {
+  const state = /** @type {Local} */ (local);
+  const perBar = beatsPerBar();
+  const strip = h("div.chord-events", { role: "group", "aria-label": t("chords.events") });
+  state.events.forEach((event, i) => {
+    const button = h(
+      `button.chord-event${i === state.selected ? ".selected" : ""}${state.inherited ? ".inherited" : ""}`,
+      { type: "button", "aria-pressed": String(i === state.selected), onclick: () => select(i) },
+      h("span", null, event.symbol),
+      h("small", null, durationLabel(event.beats)),
+    );
+    button.style.flexGrow = String(event.beats);
+    strip.append(button);
+  });
+  const current = state.events[state.selected];
+  const tools = current
+    ? h(
+        "div.chord-tools",
+        null,
+        h("span.muted", null, t("chords.duration")),
+        ...durations().map(([label, beats]) =>
+          h(
+            `button.small${current.beats === beats ? ".primary" : ""}`,
+            { type: "button", onclick: () => update((events) => (events[state.selected].beats = beats)) },
+            label,
+          ),
+        ),
+        h(
+          "button.small",
+          {
+            type: "button",
+            title: t("chords.splitTitle"),
+            disabled: current.beats < 2,
+            onclick: () =>
+              update((events) => {
+                const half = Math.floor(current.beats / 2);
+                events.splice(state.selected, 1, { ...current, beats: current.beats - half }, { ...current, beats: half });
+              }),
+          },
+          t("chords.split"),
+        ),
+        h(
+          "button.small",
+          {
+            type: "button",
+            onclick: () => update((events) => events.splice(state.selected + 1, 0, { symbol: current.symbol, beats: perBar })),
+          },
+          t("chords.insert"),
+        ),
+        h(
+          "button.small",
+          {
+            type: "button",
+            disabled: state.events.length < 2,
+            onclick: () => update((events) => events.splice(state.selected, 1)),
+          },
+          t("chords.remove"),
+        ),
+      )
+    : null;
+  return [strip, tools];
 }
 
 function render() {
@@ -151,34 +286,16 @@ function render() {
     return;
   }
   const state = local;
-  const bars = h("div.chord-bars", { role: "group", "aria-label": t("chords.bars") });
-  const fillBars = () =>
-    bars.replaceChildren(
-      ...Array.from({ length: target.bars }, (_, i) =>
-        h(
-          `button.chord-bar${i === state.bar ? ".selected" : ""}${
-            state.inherited ? ".inherited" : ""
-          }`,
-          { type: "button", "aria-pressed": String(i === state.bar), onclick: () => selectBar(i) },
-          h("small", null, String(i + 1)),
-          h("span", null, state.tokens[i] ?? "–"),
-        ),
-      ),
-    );
-  fillBars();
-  // Typing only refreshes the bar strip: a full re-render would swallow the click that blurred
-  // the input (e.g. on Save).
+  const totalBeats = state.events.reduce((sum, e) => sum + e.beats, 0);
   const input = /** @type {HTMLInputElement} */ (
     h("input", {
-      value: state.tokens.join(" "),
-      placeholder: "Am F C G",
+      value: eventsText(state.events),
+      placeholder: "C*2 (Am F) G:3 G7:1",
       "aria-label": t("chords.gridLabel"),
-      onchange: () => {
-        state.tokens = expand(parseChords(input.value), target.bars);
-        state.inherited = false;
-        fillBars();
-        loadNext();
+      oninput: () => {
+        state.typed = input.value;
       },
+      onchange: () => parseText(input.value),
     })
   );
   root.replaceChildren(
@@ -190,8 +307,16 @@ function render() {
       input,
       h("small", null, state.inherited ? t("chords.inherited") : t("chords.hint")),
     ),
-    bars,
-    h("h3", null, t("chords.next", { bar: state.bar + 1 })),
+    ...eventEditor(),
+    h(
+      "p.muted",
+      null,
+      t("chords.length", {
+        bars: Math.round((totalBeats / beatsPerBar()) * 100) / 100,
+        section: target.bars,
+      }),
+    ),
+    h("h3", null, t("chords.next", { n: state.selected + 1 })),
     h("div.chips", null, ...state.next.map((c) => chip(c, t(`chords.kind.${c.kind}`)))),
     h("h3", null, t("chords.diatonic")),
     h("div.chips", null, ...state.diatonic.map((c) => chip(c))),
@@ -211,7 +336,13 @@ function render() {
           null,
           h(
             "button.progression",
-            { type: "button", onclick: () => useProgression(p.chords.map((c) => c.symbol)) },
+            {
+              type: "button",
+              onclick: () =>
+                update((events) =>
+                  events.splice(0, events.length, ...p.chords.map((c) => ({ symbol: c.symbol, beats: beatsPerBar() }))),
+                ),
+            },
             h("strong", null, p.chords.map((c) => c.symbol).join(" ")),
             h("small", null, p.numerals),
           ),
@@ -222,16 +353,9 @@ function render() {
     h(
       "footer",
       null,
-      h("button", { type: "button", onclick: () => save(null) }, t("chords.useProject")),
+      h("button", { type: "button", onclick: () => save(true) }, t("chords.useProject")),
       h("button", { type: "button", onclick: () => dialog().close() }, t("form.close")),
-      h(
-        "button.primary",
-        {
-          type: "button",
-          onclick: () => save(state.inherited ? null : parseChords(input.value)),
-        },
-        t("form.save"),
-      ),
+      h("button.primary", { type: "button", onclick: () => save(false) }, t("form.save")),
     ),
   );
 }

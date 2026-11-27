@@ -123,9 +123,9 @@ Always run `make lint` and `make test` before declaring a task done.
 - **Track**: project, role (`drums | bass | chords | pad | lead | other`), GM program, name, mute/solo.
 - **Clip**: belongs to a track; `bars`; `notes[]` as `{t, p, d, v}` (tick, pitch, duration ticks, velocity 1–127); `locked` flag.
 - **ClipVersion**: history of a clip's content with `seed`, `source` (`model | manual | import`), `score`, `params` (JSON), `created_at`. A clip points to its current version.
-- **Section**: name, `bars`, `chord_grid` (one entry per bar; empty = cycle the project's `chord_grid`), `slots{track_id -> clip_id}`.
+- **Section**: name, `bars`, `chord_grid` (chord events with durations; empty = use the project's `chord_grid`), `slots{track_id -> clip_id}`.
 - **Arrangement**: ordered list of `SectionInstance(section_id)`. The same `Section` can appear several times; editing it changes every instance.
-- **chord_grid**: one entry per bar of each section: `{root, quality, pitch_class_set}`, stored on the Section; the Project's `chord_grid` is the default progression, cycled over sections without their own grid.
+- **chord_grid**: a progression of chord events `{root, quality, pitch_class_set, beats?}` (no `beats` = one bar), stored on the Section; the Project's `chord_grid` is the default progression for sections without their own. A section cycles its progression over its length into a tick timeline (`core/progression.py`). The API also accepts progression text: `Am` one bar, `C*2` two bars, `(Am F)` split bar, `G:3` three beats, `%` repeat.
 
 ### 5.3 Operations (must stay simple)
 
@@ -221,6 +221,7 @@ POST   /projects/{id}/generate-all          # one job over every (section, track
 GET    /harmony/diatonic?tonic=&mode=       # diatonic chords with roman numerals
 POST   /harmony/suggest                     # progressions for a section (rules; LLM when available and prompted)
 POST   /harmony/next                        # suggested chord changes after/instead of a chord
+POST   /harmony/parse                       # validate progression text, canonical form + events
 POST   /projects/{id}/plan                  # song plan preview from a prompt (no writes)
 POST   /projects/{id}/plan/apply            # create sections, arrangement and tracks from a plan
 GET    /llm/status                          # Ollama reachable? model name

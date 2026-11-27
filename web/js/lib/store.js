@@ -3,10 +3,10 @@
 
 /**
  * @typedef {{t: number, p: number, d: number, v: number}} Note
- * @typedef {{root: number, quality: string, pitch_class_set: number[], symbol: string}} Chord
+ * @typedef {{root: number, quality: string, pitch_class_set: number[], symbol: string, beats?: number}} Chord
  * @typedef {{id: number, role: string, program: number, name: string, mute: boolean, solo: boolean, position: number}} Track
- * @typedef {{id: number, name: string, bars: number, chord_grid: Chord[], slots: Record<string, number>}} Section
- * @typedef {{id: number, name: string, bpm: number, ts_numerator: number, ts_denominator: number, key_tonic: number, key_mode: string, genre: string, chord_grid: Chord[], tracks: Track[], sections: Section[], arrangement: number[]}} Project
+ * @typedef {{id: number, name: string, bars: number, chord_grid: Chord[], chord_text: string, slots: Record<string, number>}} Section
+ * @typedef {{id: number, name: string, bpm: number, ts_numerator: number, ts_denominator: number, key_tonic: number, key_mode: string, genre: string, chord_grid: Chord[], chord_text: string, tracks: Track[], sections: Section[], arrangement: number[]}} Project
  * @typedef {{id: number, track_id: number, bars: number, locked: boolean, current_version: {notes: Note[], score: number|null, seed: number|null} | null}} Clip
  * @typedef {{jobId: string, status: string, detail: Record<string, any>}} JobState
  * @typedef {{id: string, name: string, format: string, size: number, active: boolean}} Bank

@@ -13,41 +13,55 @@ import { barTicks } from "../lib/timebase.js";
 const ACTIVE = new Set(["queued", "started", "sampling", "candidate"]);
 export const ZOOM_LEVELS = [24, 36, 56, 80, 120];
 
-/** @param {Array<{symbol: string}>} grid */
-function chordText(grid) {
-  return grid.map((c) => c.symbol).join(" ");
-}
 
 /**
- * Chord lane block for one section instance: one button per bar, the section's own grid or
- * (faded) the project's progression cycled over the section, as the generator does.
+ * Chord lane block for one section instance: the section's progression (or, faded, the
+ * project's) cycled over the section like the generator does, each chord as wide as it lasts.
+ * Clicking a chord edits that event of the progression.
  * @param {import("../lib/store.js").Section} section
  * @param {import("../lib/store.js").Chord[]} projectGrid
  * @param {boolean} selected
  * @param {number} zoom  px per bar
+ * @param {number} perBar  beats per bar
  */
-function chordBlock(section, projectGrid, selected, zoom) {
+function chordBlock(section, projectGrid, selected, zoom, perBar) {
   const inherited = !section.chord_grid.length;
   const grid = inherited ? projectGrid : section.chord_grid;
   const block = h(
     `div.tl-chord-block${inherited ? ".inherited" : ""}${selected ? ".selected" : ""}`,
   );
-  for (let bar = 0; bar < section.bars; bar++) {
-    const symbol = grid.length ? grid[bar % grid.length].symbol : "";
-    const repeated = bar > 0 && grid.length > 0 && grid[(bar - 1) % grid.length].symbol === symbol;
+  block.style.width = `${section.bars * zoom}px`;
+  const total = section.bars * perBar;
+  if (!grid.length) {
     block.append(
       h(
         "button.tl-chord",
-        {
-          type: "button",
-          title: t("chords.edit", { section: section.name, bar: bar + 1 }),
-          onclick: () => openChordDialog(section.id, bar).catch(showError),
-        },
-        repeated ? "%" : symbol || "–",
+        { type: "button", onclick: () => openChordDialog(section.id, 0).catch(showError) },
+        "–",
       ),
     );
+    return block;
   }
-  block.style.width = `${section.bars * zoom}px`;
+  let beat = 0;
+  let previous = "";
+  for (let i = 0; beat < total; i++) {
+    const index = i % grid.length;
+    const chord = grid[index];
+    const beats = Math.min(chord.beats ?? perBar, total - beat);
+    const button = h(
+      "button.tl-chord",
+      {
+        type: "button",
+        title: t("chords.edit", { section: section.name, chord: chord.symbol }),
+        onclick: () => openChordDialog(section.id, index).catch(showError),
+      },
+      chord.symbol === previous ? "%" : chord.symbol,
+    );
+    button.style.flex = `0 0 ${(beats / perBar) * zoom}px`;
+    block.append(button);
+    previous = chord.symbol;
+    beat += beats;
+  }
   return block;
 }
 
@@ -140,7 +154,7 @@ export function renderArrangement(root, state) {
   for (const { index, section } of instances) {
     if (!section) continue;
     const selected = index === state.selected;
-    const chords = chordText(section.chord_grid);
+    const chords = section.chord_text;
     const numbers = h(
       "div.bar-numbers",
       { "aria-hidden": "true" },
@@ -174,7 +188,9 @@ export function renderArrangement(root, state) {
   const chordLane = h("div.tl-chords", { role: "row" });
   for (const { index, section } of instances) {
     if (section) {
-      chordLane.append(chordBlock(section, project.chord_grid, index === state.selected, zoom));
+      chordLane.append(
+        chordBlock(section, project.chord_grid, index === state.selected, zoom, project.ts_numerator),
+      );
     }
   }
   grid.append(h("div.tl-corner.tl-chords-head", null, t("chords.lane")), chordLane);
