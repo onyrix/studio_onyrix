@@ -1,7 +1,7 @@
 # macOS / Linux. On Windows use tasks.ps1 (same targets).
 PY ?= .venv/bin/python
 
-.PHONY: setup dev run test test-infer lint fetch-models fetch-soundfont bench migrate
+.PHONY: setup dev run test test-infer lint fetch-models fetch-soundfont fetch-corpus bench migrate
 
 setup:
 	python3 -m venv .venv
@@ -33,6 +33,9 @@ fetch-models:
 
 fetch-soundfont:
 	$(PY) scripts/fetch_soundfont.py
+
+fetch-corpus:
+	$(PY) scripts/fetch_corpus.py
 
 bench:
 	$(PY) scripts/benchmark_models.py

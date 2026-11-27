@@ -22,6 +22,7 @@ class Settings:
     fallback_model_name: str = "yellow_medium"
     device: str = "auto"  # auto | cpu | cuda | mps
     soundfont_dir: str = str(ROOT_DIR / "data" / "soundfonts")
+    corpus_dir: str = str(ROOT_DIR / "data" / "corpus")
     n_candidates: int = 4
     host: str = "127.0.0.1"
     port: int = 8000
@@ -42,6 +43,7 @@ class Settings:
             fallback_model_name=_env("FALLBACK_MODEL", defaults.fallback_model_name),
             device=_env("DEVICE", defaults.device),
             soundfont_dir=_env("SOUNDFONT_DIR", defaults.soundfont_dir),
+            corpus_dir=_env("CORPUS_DIR", defaults.corpus_dir),
             n_candidates=int(_env("N_CANDIDATES", str(defaults.n_candidates))),
             host=_env("HOST", defaults.host),
             port=int(_env("PORT", str(defaults.port))),

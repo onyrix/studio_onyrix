@@ -99,6 +99,7 @@ make test-infer   # pytest -m inference (downloads weights if missing)
 make lint         # ruff check + ruff format --check + mypy app
 make fetch-models # pre-download prism_medium and yellow_medium
 make fetch-soundfont # download the default sound bank (MuseScore General, MIT) into data/soundfonts
+make fetch-corpus # download + index the optional chord corpus (Chordonomicon, CC BY-NC 4.0) into data/corpus
 make bench        # scripts/benchmark_models.py
 ```
 
@@ -225,6 +226,7 @@ POST   /harmony/parse                       # validate progression text, canonic
 GET    /harmony/audition.mid?project_id=&text= # a progression as voiced block chords + root bass (browser audition)
 GET    /harmony/kits?project_id=&moods=     # song kits (core/library.py) realized in the project key
 POST   /harmony/kits/apply                  # write a kit into sections of matching kind, create missing ones
+GET    /corpus ; POST /corpus/download ; DELETE /corpus   # optional chord corpus: status, background import, removal
 POST   /projects/{id}/plan                  # song plan preview from a prompt (no writes)
 POST   /projects/{id}/plan/apply            # create sections, arrangement and tracks from a plan
 GET    /llm/status                          # Ollama reachable? model name
@@ -299,6 +301,7 @@ Order (decided 2026-11-26): C1 → C2 → C3 → C4 → M4 → M5 → M6, compos
 - **No chord conditioning in `yellow_medium`.** When it is the active model, harmony coherence comes only from context tracks and from the scorer's `CT`; use more candidates (N=8).
 - **Latency** is unmeasured until M5; do not promise numbers in the UI.
 - **Local LLM quality varies.** Ollama models differ in how well they follow JSON schemas and music theory. Every LLM answer is validated and repaired by rules; the keyword interpreter and `RuleBasedPlanner` must stay good enough on their own.
+- **Chord corpus licence.** Chordonomicon is CC BY-NC 4.0 (dataset card checked 2026-11-27; earlier search results said MIT, which is wrong). Fine for this personal, non-commercial app with attribution shown in the UI. It is downloaded on demand from Hugging Face into the git-ignored `data/corpus`, only the derived statistics index is kept, and it is never bundled or committed. Harmony statistics fall back to our own library when it is absent.
 - **Sound bank licences.** Only banks whose licence allows it are downloaded by the app (MuseScore General, MIT). Banks such as Timbres of Heaven (non-commercial, no redistribution) are only imported by the user; never host or bundle them.
 - **Playback = export.** The browser plays the server-exported MIDI through SpessaSynth, so playback and the DAW export cannot drift. The JS channel map (`web/js/lib/player.js` `channelMap`) must mirror `app/midi_io.py` `_channels`.
 - **Headless browsers cannot verify live audio.** In headless Chrome the audio thread does not run (AudioWorklet modules never load, the clock stays at 0). Verify synthesis offline with `spessasynth_core` (`SpessaSynthProcessor` + `SpessaSynthSequencer` on the main thread) and confirm live playback by ear.

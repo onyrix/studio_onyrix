@@ -33,7 +33,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | D3 ✅ | How should bass/harmony follow chord changes? | **Decided (2026-11-26):** all layers, CLAUDE.md §6.8 — `pitch_class_set` spike, deterministic harmonic snap, optional strict-harmony block generation, per-role CT weight + N=8 on yellow. | — |
 | D4 ✅ | What is "Regenerate with note" (CLAUDE.md §8)? | **Decided (2026-11-26):** free-text prompt → structured `GenerationIntent` (CLAUDE.md §6.7), keyword interpreter offline, local Ollama when available. | — |
 | D6 ✅ | Which LLM backend? | **Decided (2026-11-26):** local Ollama only, stdlib HTTP, rule-based fallback. | — |
-| D7 ✅ | How should the progression picker work? | **Decided (2026-11-27):** all layers — harmonic rhythm (B-55), curated library with song kits + audition (B-56), optional local import of Chordonomicon (MIT) / ChoCo (mostly CC-BY) (B-57), generator + operators with an audacity control and surprise meter (B-58), prompt via Ollama mapped to parameters (B-59). | — |
+| D7 ✅ | How should the progression picker work? | **Decided (2026-11-27):** all layers — harmonic rhythm (B-55), curated library with song kits + audition (B-56), optional on-demand import of Chordonomicon (CC BY-NC 4.0, attribution in the UI) (B-57), generator + operators with an audacity control and surprise meter (B-58), prompt via Ollama mapped to parameters (B-59). | — |
 | D5 ❓ | Should the master export include muted tracks? | Today: yes (mute = playback state only). Alternative: skip muted, or ask at export. | B-36 |
 
 ## H — Harmonic explorer (next up)

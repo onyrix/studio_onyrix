@@ -12,8 +12,9 @@ from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import clips, export, generate, harmony, health, projects, soundfonts
+from app.api import clips, corpus, export, generate, harmony, health, projects, soundfonts
 from app.config import WEB_DIR, Settings
+from app.corpus import CorpusStore
 from app.db.base import Base
 from app.db.session import MEMORY_URLS, make_engine, make_session_factory
 from app.gen.engine import Engine, MidiGptEngine
@@ -44,9 +45,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.state.jobs = jobs
     app.state.candidates = {}
     app.state.soundfonts = SoundfontStore(settings.soundfont_dir)
+    app.state.corpus = CorpusStore(settings.corpus_dir)
 
     api = APIRouter(prefix="/api")
-    for module in (health, projects, clips, generate, harmony, export, soundfonts):
+    for module in (health, projects, clips, generate, harmony, corpus, export, soundfonts):
         api.include_router(module.router)
     app.include_router(api)
 
