@@ -227,6 +227,9 @@ GET    /harmony/audition.mid?project_id=&text= # a progression as voiced block c
 GET    /harmony/kits?project_id=&moods=     # song kits (core/library.py) realized in the project key
 POST   /harmony/kits/apply                  # write a kit into sections of matching kind, create missing ones
 GET    /corpus ; POST /corpus/download ; DELETE /corpus   # optional chord corpus: status, background import, removal
+POST   /harmony/explore                     # new progressions from chord statistics, audacity 0..1
+GET    /harmony/operators ; POST /harmony/transform   # progression operators (core/operators.py)
+POST   /harmony/prompt                      # free text -> harmony intent -> library + generated progressions
 POST   /projects/{id}/plan                  # song plan preview from a prompt (no writes)
 POST   /projects/{id}/plan/apply            # create sections, arrangement and tracks from a plan
 GET    /llm/status                          # Ollama reachable? model name

@@ -16,7 +16,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | M2 | Adapter, engine, candidates, scorer, post-processing, `/generate` + SSE | ✅ | 4 candidates, best by S, same seed ⇒ same notes, with the real model too. |
 | M3 | Vanilla frontend: arrangement timeline, transport, playback, export | ✅ | Playback confirmed audible by the user (2026-11-26). Tone.js timbres judged poor → replaced by SpessaSynth + SoundFont banks (B-01…B-04). |
 | C1 | Harmony: chord lane, diatonic chords, suggestions (rule-based planner) | ✅ | Chord lane + chord dialog checked in headless Chrome (2026-11-26). Order decided 2026-11-26: C1 → C2 → C3 → C4 → M4 → M5. |
-| H | **Harmonic explorer** (progression picker: library + corpus + generator + prompt) | 🟡 | **Top priority (user, 2026-11-26)**, before finishing C2. Items B-55…B-59. |
+| H | **Harmonic explorer** (progression picker: library + corpus + generator + prompt) | ✅ | **Top priority (user, 2026-11-26)**, before finishing C2. Items B-55…B-59. |
 | C2 | Harmony adherence + benchmark | 🟡 | Items B-20, B-70…B-74. |
 | C3 | Prompt per part ("Regenerate with note") | ⬜ | Items B-16, B-80…B-84. |
 | C4 | Song from prompt + "Generate all" | ⬜ | Items B-21, B-22, B-41, B-90…B-94. |
@@ -44,7 +44,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | B-56 | Curated library (`core/library.py`: 45 progressions, 12 song kits, roman numerals + harmonic rhythm, tags kind / genre / mood / energy), planner on top of it, voice-led audition (`/harmony/audition.mid`), mood filters + ▶ in the chord dialog, "Kit armonici" dialog that fills or creates the song form. Audio checked offline only: **listen in a real browser pending** | ✅ |
 | B-57 | On-demand corpus import (Chordonomicon, CC BY-NC 4.0, attribution in the UI) into git-ignored `data/corpus`: key estimation per song, sections → reduced numerals, uni/bi/trigram + loop statistics per mode × kind × genre, gzip index only (CSV deleted); library statistics as offline fallback; `make fetch-corpus`; UI download / progress / remove | ✅ |
 | B-58 | 14 operators (chord: relative, borrow, tritone sub, secondary dominant, chromatic mediant, sus resolve, passing dim7, deceptive; progression: sevenths, tonic pedal, negative harmony, double / half time, step up), statistics generator with audacity slider, surprise meter on current / library / generated progressions; "Esplora e trasforma" panel | ✅ |
-| B-59 | Prompt → harmonic parameters (Ollama, keyword fallback) → ranked candidates with an explanation | ⬜ |
+| B-59 | Prompt → `HarmonyIntent` (moods, mode, genre, section, audacity, length, operators): local Ollama (stdlib HTTP, JSON schema, validated) or Italian / English keywords; `/harmony/prompt` returns library + generated progressions with operators applied; `/llm/status`; prompt box in the explore panel. Ollama not installed on the dev machine: tested against a fake server | ✅ |
 
 ## P1 — next up
 

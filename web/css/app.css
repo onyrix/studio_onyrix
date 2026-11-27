@@ -884,3 +884,13 @@ label.inline input[type="range"] {
 .corpus-line small {
   flex-basis: 100%;
 }
+
+.prompt-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.prompt-row input {
+  flex: 1;
+}

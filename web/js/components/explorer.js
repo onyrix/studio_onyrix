@@ -32,6 +32,10 @@ const state = {
   corpus: null,
   busy: false,
   infoFor: "",
+  prompt: "",
+  /** @type {any} */
+  answer: null,
+  asking: false,
 };
 
 /** @type {() => void} */
@@ -129,6 +133,86 @@ async function applyOperator(ctx, operator) {
     const detail = e instanceof Error ? e.message : String(e);
     ctx.onError(t("explore.notApplicable", { op: t(`op.${operator}`), detail }));
   }
+}
+
+/** @param {Context} ctx */
+async function ask(ctx) {
+  const project = getState().project;
+  if (!project || !state.prompt.trim()) return;
+  state.asking = true;
+  rerender();
+  try {
+    state.answer = await api.harmonyPrompt({
+      project_id: project.id,
+      section_id: ctx.sectionId,
+      text: state.prompt,
+      seed: state.seed,
+    });
+    state.seed += 1;
+  } catch (e) {
+    showError(e);
+  } finally {
+    state.asking = false;
+    rerender();
+  }
+}
+
+/** What the prompt was understood as, in words. */
+function intentSummary() {
+  const a = state.answer;
+  if (!a) return null;
+  const i = a.intent;
+  const parts = [
+    ...i.moods.map((/** @type {string} */ m) => t(`mood.${m}`)),
+    i.kind ? t(`sectionKind.${i.kind}`) : "",
+    i.genre,
+    i.mode ? t(`mode.${i.mode}`) : "",
+    i.audacity !== null ? t("explore.audacityValue", { n: Math.round(i.audacity * 100) }) : "",
+    i.length ? t("explore.chords", { n: i.length }) : "",
+    ...i.operators.map((/** @type {string} */ op) => t(`op.${op}`)),
+  ].filter(Boolean);
+  return h(
+    "p.muted",
+    null,
+    t("prompt.understood", {
+      source: t(`prompt.source.${a.source}`),
+      what: parts.length ? parts.join(", ") : t("prompt.nothing"),
+    }),
+    a.key.changed ? ` ${t("prompt.keyChanged", { mode: t(`mode.${a.key.mode}`) })}` : "",
+  );
+}
+
+/**
+ * @param {Context} ctx
+ * @param {Described & {origin?: string}} idea
+ */
+function ideaRow(ctx, idea) {
+  return h(
+    "li.progression-row",
+    null,
+    h(
+      "button.small.listen",
+      { type: "button", "aria-label": t("chords.listen"), onclick: () => audition(idea.chord_text).catch(showError) },
+      "▶",
+    ),
+    h(
+      "button.progression",
+      {
+        type: "button",
+        title: t("chords.use"),
+        onclick: () => ctx.apply(idea.chords.map((c) => ({ symbol: c.symbol, beats: c.beats }))),
+      },
+      h("strong", null, idea.chord_text),
+      h(
+        "small",
+        null,
+        idea.origin ? `${t(`prompt.origin.${idea.origin}`)} · ` : "",
+        idea.numerals,
+        " ",
+        meter(idea.surprise_level),
+      ),
+    ),
+  );
 }
 
 /** @param {Context} ctx */
@@ -241,6 +325,29 @@ export function explorerPanel(ctx) {
     "details.explorer",
     { open: true },
     h("summary", null, t("explore.title")),
+    h(
+      "form.prompt-row",
+      {
+        onsubmit: (/** @type {Event} */ e) => {
+          e.preventDefault();
+          ask(ctx);
+        },
+      },
+      h("input", {
+        value: state.prompt,
+        placeholder: t("prompt.placeholder"),
+        "aria-label": t("prompt.label"),
+        maxlength: 1000,
+        oninput: (/** @type {Event} */ e) => {
+          state.prompt = /** @type {HTMLInputElement} */ (e.target).value;
+        },
+      }),
+      h("button.small.primary", { type: "submit", disabled: state.asking }, state.asking ? t("prompt.asking") : t("prompt.ask")),
+    ),
+    intentSummary(),
+    state.answer?.progressions.length
+      ? h("ul.progressions", null, ...state.answer.progressions.map((/** @type {any} */ p) => ideaRow(ctx, p)))
+      : null,
     state.info
       ? h("p.current-info", null, h("span", null, `${state.info.numerals} `), meter(state.info.surprise_level))
       : null,
@@ -261,31 +368,7 @@ export function explorerPanel(ctx) {
       ),
     ),
     state.ideas.length
-      ? h(
-          "ul.progressions",
-          null,
-          ...state.ideas.map((idea) =>
-            h(
-              "li.progression-row",
-              null,
-              h(
-                "button.small.listen",
-                { type: "button", "aria-label": t("chords.listen"), onclick: () => audition(idea.chord_text).catch(showError) },
-                "▶",
-              ),
-              h(
-                "button.progression",
-                {
-                  type: "button",
-                  title: t("chords.use"),
-                  onclick: () => ctx.apply(idea.chords.map((c) => ({ symbol: c.symbol, beats: c.beats }))),
-                },
-                h("strong", null, idea.chord_text),
-                h("small", null, idea.numerals, " ", meter(idea.surprise_level)),
-              ),
-            ),
-          ),
-        )
+      ? h("ul.progressions", null, ...state.ideas.map((idea) => ideaRow(ctx, idea)))
       : null,
     corpusLine(),
   );
