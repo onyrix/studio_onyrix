@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import DbSession, get_or_404
 from app.api.schemas import MAX_SECTION_BARS
+from app.core import library
 from app.core.harmony import (
     chord_slot_to_dict,
     chord_symbol,
@@ -17,8 +18,9 @@ from app.core.harmony import (
     roman_numeral,
     suggest_next,
 )
+from app.core.library import LibraryProgression
 from app.core.model import ChordSlot, Key, Mode
-from app.core.progression import parse_progression, progression_text
+from app.core.progression import ChordEvent, parse_progression, progression_text
 from app.core.timebase import TimeSignature
 from app.db.models import Project, Section
 from app.gen.planner import SECTION_KINDS, RuleBasedPlanner, kind_from_name, normalize_kind
@@ -36,9 +38,17 @@ class ChordOut(BaseModel):
     pitch_class_set: list[int]
 
 
+class EventOut(ChordOut):
+    beats: int  # always explicit here (a whole bar = the time signature numerator)
+
+
 class ProgressionOut(BaseModel):
-    chords: list[ChordOut]
-    numerals: str
+    id: str
+    chords: list[EventOut]
+    chord_text: str  # chord symbols, progression syntax (what a section grid accepts)
+    numerals: str  # same rhythm, roman numerals
+    moods: list[str]
+    energy: float
 
 
 class SuggestRequest(BaseModel):
@@ -46,7 +56,16 @@ class SuggestRequest(BaseModel):
     section_id: int | None = None
     section_kind: str | None = None  # default: guessed from the section name
     bars: int | None = Field(default=None, ge=1, le=MAX_SECTION_BARS)
-    n: int = Field(default=5, ge=1, le=12)
+    moods: list[str] = Field(default_factory=list)
+    n: int = Field(default=5, ge=1, le=len(library.PROGRESSIONS))
+
+    @field_validator("moods")
+    @classmethod
+    def _known_moods(cls, value: list[str]) -> list[str]:
+        unknown = sorted(set(value) - set(library.MOODS))
+        if unknown:
+            raise ValueError(f"unknown moods: {', '.join(unknown)}")
+        return value
 
 
 class SuggestOut(BaseModel):
@@ -68,10 +87,6 @@ class ParseRequest(BaseModel):
     text: str = Field(max_length=4000)
 
 
-class EventOut(ChordOut):
-    beats: int  # always explicit here (a whole bar = the time signature numerator)
-
-
 class ParseOut(BaseModel):
     chord_text: str
     events: list[EventOut]
@@ -87,6 +102,27 @@ def chord_out(chord: ChordSlot, key: Key) -> dict[str, Any]:
 
 def project_key(project: Project) -> Key:
     return Key(project.key_tonic, Mode(project.key_mode))
+
+
+def project_ts(project: Project) -> TimeSignature:
+    return TimeSignature(project.ts_numerator, project.ts_denominator)
+
+
+def events_out(events: list[ChordEvent], key: Key, ts: TimeSignature) -> list[dict[str, Any]]:
+    return [{**chord_out(e.chord, key), "beats": e.beats or ts.numerator} for e in events]
+
+
+def progression_out(
+    source: LibraryProgression, events: list[ChordEvent], key: Key, ts: TimeSignature
+) -> dict[str, Any]:
+    return {
+        "id": source.id,
+        "chords": events_out(events, key, ts),
+        "chord_text": progression_text(events, key, ts),
+        "numerals": progression_text(events, key, ts, namer=lambda c: roman_numeral(c, key)),
+        "moods": sorted(source.moods),
+        "energy": source.energy,
+    }
 
 
 @router.get("/diatonic", response_model=list[ChordOut])
@@ -113,16 +149,11 @@ def suggest(body: SuggestRequest, db: DbSession) -> dict[str, Any]:
         kind = kind_from_name(section.name) if section else ""
     bars = body.bars or (section.bars if section else 4)
     key = project_key(project)
-    grids = planner.suggest_progressions(key, project.genre, kind, bars, body.n)
+    ts = project_ts(project)
+    found = planner.suggest_progressions(key, project.genre, kind, bars, body.n, body.moods, ts)
     return {
         "section_kind": kind,
-        "progressions": [
-            {
-                "chords": [chord_out(c, key) for c in grid],
-                "numerals": " ".join(roman_numeral(c, key) for c in grid),
-            }
-            for grid in grids
-        ],
+        "progressions": [progression_out(p.source, p.events, key, ts) for p in found],
     }
 
 
@@ -141,7 +172,7 @@ def next_chords(body: NextRequest, db: DbSession) -> list[dict[str, Any]]:
 def parse(body: ParseRequest, db: DbSession) -> dict[str, Any]:
     """Validate progression text (core.progression syntax) and return its canonical form."""
     project = get_or_404(db, Project, body.project_id)
-    ts = TimeSignature(project.ts_numerator, project.ts_denominator)
+    ts = project_ts(project)
     try:
         events = parse_progression(body.text, ts)
     except ValueError as exc:
@@ -149,5 +180,5 @@ def parse(body: ParseRequest, db: DbSession) -> dict[str, Any]:
     key = project_key(project)
     return {
         "chord_text": progression_text(events, key, ts),
-        "events": [{**chord_out(e.chord, key), "beats": e.beats or ts.numerator} for e in events],
+        "events": events_out(events, key, ts),
     }

@@ -23,12 +23,31 @@ def test_suggest_uses_the_section_name_and_length(client: TestClient) -> None:
     assert out["section_kind"] == "chorus"
     assert len(out["progressions"]) == 5
     first = out["progressions"][0]
-    assert len(first["chords"]) == 8
-    assert first["numerals"].startswith("I V vi IV")
-    # Accepting a suggestion = PATCH the section grid with its symbols.
-    symbols = [c["symbol"] for c in first["chords"]]
-    patched = client.patch(f"/api/sections/{section.json()['id']}", json={"chord_grid": symbols})
+    assert (first["id"], first["numerals"], first["chord_text"]) == (
+        "axis",
+        "I V vi IV",
+        "C G Am F",
+    )
+    assert [c["beats"] for c in first["chords"]] == [4, 4, 4, 4]
+    assert "bright" in first["moods"]
+    # Accepting a suggestion = PATCH the section grid with its text.
+    sid = section.json()["id"]
+    patched = client.patch(f"/api/sections/{sid}", json={"chord_grid": first["chord_text"]})
     assert patched.status_code == 200
+
+
+def test_suggest_keeps_harmonic_rhythm_and_filters_moods(client: TestClient) -> None:
+    pid = _project(client, genre="jazz")
+    out = client.post(
+        "/api/harmony/suggest",
+        json={"project_id": pid, "section_kind": "verse", "moods": ["calm"], "n": 3},
+    ).json()
+    assert all("calm" in p["moods"] for p in out["progressions"])
+    first = out["progressions"][0]
+    assert (first["chord_text"], first["numerals"]) == ("Dm7 G7 Cmaj7*2", "ii7 V7 Imaj7*2")
+    assert [c["beats"] for c in first["chords"]] == [4, 4, 8]
+    bad = {"project_id": pid, "moods": ["angry"]}
+    assert client.post("/api/harmony/suggest", json=bad).status_code == 422
 
 
 def test_suggest_explicit_kind_and_errors(client: TestClient) -> None:
@@ -38,9 +57,10 @@ def test_suggest_explicit_kind_and_errors(client: TestClient) -> None:
         json={"project_id": pid, "section_kind": "outro", "bars": 4, "n": 2},
     ).json()
     assert out["section_kind"] == "outro"
-    assert all(p["chords"][-1]["symbol"] == "F" for p in out["progressions"])
-    # Spelled with flats in F major.
-    assert "Bb" in {c["symbol"] for p in out["progressions"] for c in p["chords"]}
+    assert len(out["progressions"]) == 2
+    # Spelled with flats in F major (borrowed bVI / bVII as Db / Eb, never C# / D#).
+    symbols = {c["symbol"] for p in out["progressions"] for c in p["chords"]}
+    assert not any("#" in s for s in symbols)
     bad = {"project_id": pid, "section_kind": "solo-guitar"}
     assert client.post("/api/harmony/suggest", json=bad).status_code == 422
     assert client.post("/api/harmony/suggest", json={"project_id": 999}).status_code == 404

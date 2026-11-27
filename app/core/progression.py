@@ -16,11 +16,12 @@ Text syntax (one token per chord, `|` bar lines are optional and ignored):
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.core.harmony import chord_slot_from_dict, chord_slot_to_dict, chord_symbol, parse_chord
+from app.core.harmony import chord_slot_from_dict, chord_slot_to_dict, parse_chord
+from app.core.harmony import chord_symbol as _symbol
 from app.core.model import ChordSlot, Key
 from app.core.timebase import FOUR_FOUR, PPQ, TimeSignature, bar_ticks
 
@@ -130,8 +131,16 @@ _TOKEN_RE = re.compile(r"\(|\)|[^\s(),|]+")
 _SUFFIX_RE = re.compile(r"^(?P<symbol>[^*:]+)(?:\*(?P<bars>\d+)|:(?P<beats>\d+))?$")
 
 
-def parse_progression(text: str, ts: TimeSignature = FOUR_FOUR) -> list[ChordEvent]:
-    """Parse the text syntax in the module docstring. Raises ValueError with a readable reason."""
+def parse_progression(
+    text: str,
+    ts: TimeSignature = FOUR_FOUR,
+    chord_parser: Callable[[str], ChordSlot] = parse_chord,
+) -> list[ChordEvent]:
+    """Parse the text syntax in the module docstring. Raises ValueError with a readable reason.
+
+    `chord_parser` reads one chord token: chord symbols by default; pass
+    `lambda n: chord_from_roman(n, key)` for roman numerals (`I V vi IV`, `ii7 V7 Imaj7*2`).
+    """
     per_bar = ts.numerator
     events: list[ChordEvent] = []
     group: list[ChordSlot] | None = None
@@ -157,7 +166,7 @@ def parse_progression(text: str, ts: TimeSignature = FOUR_FOUR) -> list[ChordEve
             match = _SUFFIX_RE.match(token)
             if not match:
                 raise ValueError(f"invalid chord token: {token!r}")
-            chord = parse_chord(match["symbol"])
+            chord = chord_parser(match["symbol"])
             if group is not None:
                 if match["bars"] or match["beats"]:
                     raise ValueError("durations are not allowed inside parentheses")
@@ -174,10 +183,18 @@ def parse_progression(text: str, ts: TimeSignature = FOUR_FOUR) -> list[ChordEve
 
 
 def progression_text(
-    events: Sequence[ChordEvent], key: Key | None = None, ts: TimeSignature = FOUR_FOUR
+    events: Sequence[ChordEvent],
+    key: Key | None = None,
+    ts: TimeSignature = FOUR_FOUR,
+    namer: Callable[[ChordSlot], str] | None = None,
 ) -> str:
-    """Inverse of `parse_progression` (canonical form)."""
+    """Inverse of `parse_progression` (canonical form). `namer` names each chord: chord
+    symbols spelled for `key` by default; pass `lambda c: roman_numeral(c, key)` for numerals."""
     per_bar = ts.numerator
+
+    def chord_symbol(chord: ChordSlot, key: Key | None) -> str:
+        return namer(chord) if namer else _symbol(chord, key)
+
     out: list[str] = []
     i = 0
     while i < len(events):
