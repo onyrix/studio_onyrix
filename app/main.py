@@ -12,13 +12,24 @@ from fastapi import APIRouter, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import clips, corpus, export, generate, harmony, health, projects, soundfonts
+from app.api import (
+    clips,
+    corpus,
+    export,
+    generate,
+    harmony,
+    health,
+    llm,
+    projects,
+    soundfonts,
+)
 from app.config import WEB_DIR, Settings
 from app.corpus import CorpusStore
 from app.db.base import Base
 from app.db.session import MEMORY_URLS, make_engine, make_session_factory
 from app.gen.engine import Engine, MidiGptEngine
 from app.gen.jobs import JobManager
+from app.gen.llm import OllamaClient
 from app.soundfonts import SoundfontStore
 
 
@@ -46,9 +57,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.state.candidates = {}
     app.state.soundfonts = SoundfontStore(settings.soundfont_dir)
     app.state.corpus = CorpusStore(settings.corpus_dir)
+    app.state.llm = OllamaClient(settings.llm_url, settings.llm_model)
 
     api = APIRouter(prefix="/api")
-    for module in (health, projects, clips, generate, harmony, corpus, export, soundfonts):
+    for module in (health, projects, clips, generate, harmony, corpus, llm, export, soundfonts):
         api.include_router(module.router)
     app.include_router(api)
 

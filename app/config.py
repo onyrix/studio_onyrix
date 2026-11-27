@@ -23,6 +23,8 @@ class Settings:
     device: str = "auto"  # auto | cpu | cuda | mps
     soundfont_dir: str = str(ROOT_DIR / "data" / "soundfonts")
     corpus_dir: str = str(ROOT_DIR / "data" / "corpus")
+    llm_url: str = "http://127.0.0.1:11434"  # local Ollama; never a remote service by default
+    llm_model: str = "qwen2.5:7b"
     n_candidates: int = 4
     host: str = "127.0.0.1"
     port: int = 8000
@@ -44,6 +46,8 @@ class Settings:
             device=_env("DEVICE", defaults.device),
             soundfont_dir=_env("SOUNDFONT_DIR", defaults.soundfont_dir),
             corpus_dir=_env("CORPUS_DIR", defaults.corpus_dir),
+            llm_url=_env("LLM_URL", defaults.llm_url),
+            llm_model=_env("LLM_MODEL", defaults.llm_model),
             n_candidates=int(_env("N_CANDIDATES", str(defaults.n_candidates))),
             host=_env("HOST", defaults.host),
             port=int(_env("PORT", str(defaults.port))),

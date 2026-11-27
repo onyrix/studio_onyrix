@@ -22,7 +22,7 @@ from app.core.harmony import (
 from app.core.harmony_stats import HarmonyStats, numerals_of, surprise_level
 from app.core.library import LibraryProgression
 from app.core.model import ChordSlot, Key, Mode
-from app.core.operators import OPERATORS, transform
+from app.core.operators import OPERATORS, NotApplicable, transform
 from app.core.progression import (
     ChordEvent,
     chord_timeline,
@@ -33,7 +33,9 @@ from app.core.progression import (
 from app.core.timebase import TimeSignature, bar_ticks
 from app.core.voicing import voice_progression
 from app.db.models import ArrangementItem, Project, Section
+from app.gen.llm import OllamaClient
 from app.gen.planner import SECTION_KINDS, RuleBasedPlanner, kind_from_name, normalize_kind
+from app.gen.prompting import interpret_harmony
 from app.midi_io import ExportTrack, build_midi, to_bytes
 
 router = APIRouter(prefix="/harmony", tags=["harmony"])
@@ -475,3 +477,71 @@ def transform_progression(
     except ValueError as exc:  # NotApplicable is a ValueError
         raise HTTPException(422, str(exc)) from exc
     return described(events, key, ts, stats_of(request), kind, project.genre.strip().lower())
+
+
+# ---- Prompt ----------------------------------------------------------------------------
+
+
+class PromptRequest(BaseModel):
+    project_id: int
+    section_id: int | None = None
+    text: str = Field(min_length=1, max_length=1000)
+    seed: int = Field(default=0, ge=0, lt=2**31)
+    n: int = Field(default=4, ge=1, le=8)  # per origin (library, generated)
+
+
+class PromptedOut(ExploredOut):
+    origin: str  # "library" | "generated"
+
+
+class PromptOut(BaseModel):
+    source: str  # who read the prompt: "ollama" | "keywords"
+    intent: dict[str, Any]
+    key: dict[str, Any]  # the key the results are in (the project's, or its parallel mode)
+    progressions: list[PromptedOut]
+
+
+def apply_operators(
+    events: list[ChordEvent], operators: tuple[str, ...], key: Key, ts: TimeSignature
+) -> list[ChordEvent]:
+    for operator in operators:
+        try:
+            events = transform(operator, events, 0, key, ts)
+        except NotApplicable:
+            continue
+    return events
+
+
+@router.post("/prompt", response_model=PromptOut)
+def from_prompt(body: PromptRequest, db: DbSession, request: Request) -> dict[str, Any]:
+    """A free-text request -> harmonic parameters (local LLM if available, else keywords) ->
+    matching library progressions and generated ideas, with the requested operators applied."""
+    project = get_or_404(db, Project, body.project_id)
+    section = section_of(db, project, body.section_id)
+    client: OllamaClient | None = getattr(request.app.state, "llm", None)
+    intent, source = interpret_harmony(body.text, client)
+    base = project_key(project)
+    key = Key(base.tonic, intent.mode) if intent.mode else base
+    ts = project_ts(project)
+    kind = intent.kind or resolve_kind(None, section)
+    genre = intent.genre or project.genre.strip().lower()
+    bars = section.bars if section else 4
+    stats = stats_of(request)
+    out: list[dict[str, Any]] = []
+    found = planner.suggest_progressions(key, genre, kind, bars, body.n, intent.moods, ts)
+    if not found:
+        found = planner.suggest_progressions(key, genre, kind, bars, body.n, (), ts)
+    for p in found:
+        events = apply_operators(p.events, intent.operators, key, ts)
+        out.append({"origin": "library", **described(events, key, ts, stats, kind, genre)})
+    audacity = intent.audacity if intent.audacity is not None else 0.35
+    ideas = stats.generate(key.mode, kind, genre, intent.length or 4, audacity, body.seed, body.n)
+    for seq, _ in ideas:
+        events = apply_operators(library.realize(" ".join(seq), key, ts), intent.operators, key, ts)
+        out.append({"origin": "generated", **described(events, key, ts, stats, kind, genre)})
+    return {
+        "source": source,
+        "intent": intent.as_dict(),
+        "key": {"tonic": key.tonic, "mode": key.mode.value, "changed": key != base},
+        "progressions": out,
+    }

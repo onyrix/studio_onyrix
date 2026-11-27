@@ -27,6 +27,7 @@ def make_app(tmp_path: Path, engine: Any) -> FastAPI:
         database_url=url,
         soundfont_dir=str(tmp_path / "soundfonts"),
         corpus_dir=str(tmp_path / "corpus"),
+        llm_url="http://127.0.0.1:9",  # nothing listens there: tests never reach a real LLM
     )
     return create_app(settings, engine=engine)
 
