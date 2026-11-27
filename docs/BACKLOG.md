@@ -36,7 +36,7 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | D7 ✅ | How should the progression picker work? | **Decided (2026-11-27):** all layers — harmonic rhythm (B-55), curated library with song kits + audition (B-56), optional on-demand import of Chordonomicon (CC BY-NC 4.0, attribution in the UI) (B-57), generator + operators with an audacity control and surprise meter (B-58), prompt via Ollama mapped to parameters (B-59). | — |
 | D5 ❓ | Should the master export include muted tracks? | Today: yes (mute = playback state only). Alternative: skip muted, or ask at export. | B-36 |
 
-## H — Harmonic explorer (next up)
+## H — Harmonic explorer (done 2026-11-27)
 
 | ID | Item | Status |
 |---|---|---|
@@ -45,6 +45,9 @@ Priority: **P1** next up · **P2** soon · **P3** later / nice to have.
 | B-57 | On-demand corpus import (Chordonomicon, CC BY-NC 4.0, attribution in the UI) into git-ignored `data/corpus`: key estimation per song, sections → reduced numerals, uni/bi/trigram + loop statistics per mode × kind × genre, gzip index only (CSV deleted); library statistics as offline fallback; `make fetch-corpus`; UI download / progress / remove. Real import checked 2026-11-27: ~20 min (download + analysis), 2.76 M sections, 0.9 MB index, top loops I V vi IV (major chorus) and i VI III VII (minor verse); surprise meter calibrated on it | ✅ |
 | B-58 | 14 operators (chord: relative, borrow, tritone sub, secondary dominant, chromatic mediant, sus resolve, passing dim7, deceptive; progression: sevenths, tonic pedal, negative harmony, double / half time, step up), statistics generator with audacity slider, surprise meter on current / library / generated progressions; "Esplora e trasforma" panel | ✅ |
 | B-59 | Prompt → `HarmonyIntent` (moods, mode, genre, section, audacity, length, operators): local Ollama (stdlib HTTP, JSON schema, validated) or Italian / English keywords; `/harmony/prompt` returns library + generated progressions with operators applied; `/llm/status`; prompt box in the explore panel. Ollama not installed on the dev machine: tested against a fake server | ✅ |
+| B-65 | Follow-up: while the corpus import runs, the 1 s status poll re-renders the chord dialog and can steal focus / caret from the prompt input; update only the corpus line instead of the whole dialog | ⬜ |
+| B-66 | Follow-up: check `/harmony/prompt` with a real local Ollama (`qwen2.5:7b` or another model): JSON-schema compliance, Italian prompts, latency; tune `HARMONY_SYSTEM` if needed (user check, Ollama not installed yet) | ⬜ |
+| B-67 | Follow-up: listen in a real browser to the progression auditions (▶ in library, explore, prompt results, "Ascolta il giro") and to the voicing (user check) | ⬜ |
 
 ## P1 — next up
 
