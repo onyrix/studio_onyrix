@@ -103,3 +103,78 @@ def test_parse(client: TestClient) -> None:
     ]
     bad = client.post("/api/harmony/parse", json={"project_id": pid, "text": "(F"})
     assert bad.status_code == 422
+
+
+def test_audition_returns_a_playable_midi(client: TestClient) -> None:
+    import io
+
+    import mido
+
+    pid = _project(client)
+    response = client.get(
+        "/api/harmony/audition.mid", params={"project_id": pid, "text": "C (Am F) G*2"}
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/midi"
+    mid = mido.MidiFile(file=io.BytesIO(response.content))
+    chords, bass = mid.tracks[1], mid.tracks[2]
+    starts = [m for m in chords if m.type == "note_on"]
+    assert len([m for m in bass if m.type == "note_on"]) == 4  # one root per chord
+    assert len(starts) == 12  # four triads
+    bad = client.get("/api/harmony/audition.mid", params={"project_id": pid, "text": "(C"})
+    assert bad.status_code == 422
+
+
+def test_kits_are_in_the_project_mode_and_key(client: TestClient) -> None:
+    pid = _project(client, key_tonic=9, key_mode="minor")
+    kits = client.get("/api/harmony/kits", params={"project_id": pid}).json()
+    assert kits and all(k["id"] for k in kits)
+    dark = client.get("/api/harmony/kits", params={"project_id": pid, "moods": "dark"}).json()
+    assert dark and all("dark" in k["moods"] for k in dark)
+    epic = next(k for k in kits if k["id"] == "epic_cinematic")
+    verse = next(p for p in epic["parts"] if p["kind"] == "verse")
+    assert (verse["chord_text"], verse["numerals"]) == ("Am*2 F*2 C*2 G*2", "i*2 VI*2 III*2 VII*2")
+
+
+def test_apply_kit_fills_an_empty_song_with_a_full_form(client: TestClient) -> None:
+    pid = _project(client)
+    body = {"project_id": pid, "kit_id": "pop_lift", "names": {"verse": "Strofa"}}
+    project = client.post("/api/harmony/kits/apply", json=body).json()
+    names = {s["id"]: s["name"] for s in project["sections"]}
+    assert [names[i] for i in project["arrangement"]] == [
+        "Strofa",
+        "Prechorus",
+        "Chorus",
+        "Strofa",
+        "Prechorus",
+        "Chorus",
+        "Bridge",
+        "Chorus",
+        "Outro",
+    ]
+    chorus = next(s for s in project["sections"] if s["name"] == "Chorus")
+    assert (chorus["chord_text"], chorus["bars"]) == ("C G Am F", 8)
+
+
+def test_apply_kit_updates_matching_sections_and_appends_missing(client: TestClient) -> None:
+    pid = _project(client)
+    verse = client.post(f"/api/projects/{pid}/sections", json={"name": "Verse 1", "bars": 4})
+    other = client.post(f"/api/projects/{pid}/sections", json={"name": "Drop", "bars": 4})
+    body = {"project_id": pid, "kit_id": "folk_story", "create_missing": True}
+    project = client.post("/api/harmony/kits/apply", json=body).json()
+    sections = {s["name"]: s for s in project["sections"]}
+    assert sections["Verse 1"]["chord_text"] == "C F C G"
+    assert sections["Drop"]["chord_text"] == ""  # unknown kind: untouched
+    assert project["arrangement"][:2] == [verse.json()["id"], other.json()["id"]]
+    assert [sections_name for sections_name in sections] == [
+        "Verse 1",
+        "Drop",
+        "Chorus",
+        "Bridge",
+        "Outro",
+    ]
+    only_update = {"project_id": pid, "kit_id": "pop_lift", "create_missing": False}
+    again = client.post("/api/harmony/kits/apply", json=only_update).json()
+    assert len(again["sections"]) == 5
+    missing = client.post("/api/harmony/kits/apply", json={"project_id": pid, "kit_id": "nope"})
+    assert missing.status_code == 404

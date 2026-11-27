@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import DbSession, get_or_404
-from app.api.schemas import MAX_SECTION_BARS
+from app.api.projects import project_out
+from app.api.schemas import MAX_SECTION_BARS, ProjectOut
 from app.core import library
 from app.core.harmony import (
     chord_slot_to_dict,
@@ -20,10 +21,18 @@ from app.core.harmony import (
 )
 from app.core.library import LibraryProgression
 from app.core.model import ChordSlot, Key, Mode
-from app.core.progression import ChordEvent, parse_progression, progression_text
-from app.core.timebase import TimeSignature
-from app.db.models import Project, Section
+from app.core.progression import (
+    ChordEvent,
+    chord_timeline,
+    event_to_dict,
+    parse_progression,
+    progression_text,
+)
+from app.core.timebase import TimeSignature, bar_ticks
+from app.core.voicing import voice_progression
+from app.db.models import ArrangementItem, Project, Section
 from app.gen.planner import SECTION_KINDS, RuleBasedPlanner, kind_from_name, normalize_kind
+from app.midi_io import ExportTrack, build_midi, to_bytes
 
 router = APIRouter(prefix="/harmony", tags=["harmony"])
 
@@ -182,3 +191,155 @@ def parse(body: ParseRequest, db: DbSession) -> dict[str, Any]:
         "chord_text": progression_text(events, key, ts),
         "events": events_out(events, key, ts),
     }
+
+
+# ---- Audition ---------------------------------------------------------------------------
+
+AUDITION_PROGRAMS = (0, 33)  # acoustic grand piano, fingered bass
+
+
+@router.get("/audition.mid")
+def audition(
+    db: DbSession,
+    project_id: int,
+    text: str = Query(min_length=1, max_length=4000),
+) -> Response:
+    """A progression (chord symbols, progression syntax) as block chords with voice leading and
+    a root bass, at the project tempo, one pass with loop markers. Played by the browser."""
+    project = get_or_404(db, Project, project_id)
+    ts = project_ts(project)
+    try:
+        events = parse_progression(text, ts)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    total = sum(e.length(ts) for e in events)
+    bars = -(-total // bar_ticks(ts))
+    spans = [s for s in chord_timeline(events, bars, ts) if s.start < total]
+    notes = voice_progression(spans)
+    upper = tuple(n for n in notes if n.p >= 48)
+    bass = tuple(n for n in notes if n.p < 48)
+    tracks = [
+        ExportTrack("Chords", AUDITION_PROGRAMS[0], False, upper),
+        ExportTrack("Bass", AUDITION_PROGRAMS[1], False, bass),
+    ]
+    mid = build_midi("Audition", project.bpm, ts, tracks, loop_ticks=total)
+    return Response(to_bytes(mid), media_type="audio/midi")
+
+
+# ---- Song kits --------------------------------------------------------------------------
+
+
+class KitPartOut(BaseModel):
+    kind: str
+    chord_text: str
+    numerals: str
+    bars: int  # suggested section length
+
+
+class KitOut(BaseModel):
+    id: str
+    moods: list[str]
+    genres: list[str]
+    parts: list[KitPartOut]
+
+
+class KitApply(BaseModel):
+    project_id: int
+    kit_id: str
+    create_missing: bool = True
+    # Display names for sections the kit creates, by kind (the UI sends translated names).
+    names: dict[str, str] = Field(default_factory=dict)
+
+
+def kit_out(kit: library.SongKit, key: Key, ts: TimeSignature) -> dict[str, Any]:
+    parts = []
+    for kind in library.PART_ORDER:
+        if kind not in kit.parts:
+            continue
+        events = library.realize(kit.parts[kind], key, ts)
+        parts.append(
+            {
+                "kind": kind,
+                "chord_text": progression_text(events, key, ts),
+                "numerals": progression_text(
+                    events, key, ts, namer=lambda c: roman_numeral(c, key)
+                ),
+                "bars": kit.bars.get(kind, library.DEFAULT_BARS[kind]),
+            }
+        )
+    return {
+        "id": kit.id,
+        "moods": sorted(kit.moods),
+        "genres": sorted(kit.genres),
+        "parts": parts,
+    }
+
+
+@router.get("/kits", response_model=list[KitOut])
+def list_kits(
+    db: DbSession, project_id: int, moods: Annotated[list[str] | None, Query()] = None
+) -> list[dict[str, Any]]:
+    """Song kits in the project's mode, realized in its key; best genre / mood match first."""
+    project = get_or_404(db, Project, project_id)
+    key, ts = project_key(project), project_ts(project)
+    found = library.kits(key.mode, project.genre.strip().lower(), moods or ())
+    return [kit_out(k, key, ts) for k in found]
+
+
+# Song form used when a kit fills an empty arrangement: repeated kinds are instances of the same
+# section (edit once, change everywhere).
+SONG_FORM = (
+    "intro",
+    "verse",
+    "prechorus",
+    "chorus",
+    "verse",
+    "prechorus",
+    "chorus",
+    "bridge",
+    "chorus",
+    "outro",
+)
+
+
+@router.post("/kits/apply", response_model=ProjectOut)
+def apply_kit(body: KitApply, db: DbSession) -> ProjectOut:
+    """Write a kit's parts into the sections of matching kind (by name, e.g. "Chorus 2");
+    with `create_missing`, create the missing ones. An empty arrangement gets a full song form.
+    Returns the updated project."""
+    project = get_or_404(db, Project, body.project_id)
+    kit = next((k for k in library.KITS if k.id == body.kit_id), None)
+    if kit is None:
+        raise HTTPException(404, f"kit {body.kit_id} not found")
+    key, ts = project_key(project), project_ts(project)
+    by_kind: dict[str, list[Section]] = {}
+    for section in project.sections:
+        by_kind.setdefault(kind_from_name(section.name), []).append(section)
+    created: dict[str, Section] = {}
+    for kind, numerals in kit.parts.items():
+        grid = [event_to_dict(e) for e in library.realize(numerals, key, ts)]
+        targets = by_kind.get(kind, [])
+        for section in targets:
+            section.chord_grid = grid
+        if not targets and body.create_missing:
+            section = Section(
+                name=body.names.get(kind) or kind.capitalize(),
+                bars=kit.bars.get(kind, library.DEFAULT_BARS[kind]),
+                chord_grid=grid,
+            )
+            project.sections.append(section)
+            created[kind] = section
+    db.flush()
+    if created:
+        if project.arrangement:
+            order = [created[k] for k in library.PART_ORDER if k in created]
+        else:
+            order = [created[k] for k in SONG_FORM if k in created]
+        start = len(project.arrangement)
+        for offset, section in enumerate(order):
+            project.arrangement.append(
+                ArrangementItem(position=start + offset, section_id=section.id)
+            )
+    db.commit()
+    db.refresh(project)
+    return project_out(project)
