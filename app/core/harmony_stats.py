@@ -28,6 +28,7 @@ from typing import Any
 from app.core import library
 from app.core.corpus_chords import CorpusChord, family_of_quality, numeral
 from app.core.model import Key, Mode
+from app.core.progression import ChordEvent
 
 FORMAT_VERSION = 1
 _ANY = ""
@@ -284,12 +285,24 @@ def _merge_repeats(numerals: Sequence[str]) -> list[str]:
     return out
 
 
-def reduce_numerals(numerals: str, key: Key) -> list[str]:
-    """Library numerals (with sevenths, durations) -> the reduced statistics vocabulary."""
-    events = library.realize(numerals, key)
-    reduced = [
+SURPRISE_LOW, SURPRISE_HIGH = 1.5, 6.0  # bits mapped to 0 and 1 by `surprise_level`
+
+
+def surprise_level(bits: float) -> float:
+    """Surprise in bits -> 0 (idiomatic) .. 1 (very unusual), for the UI meter."""
+    return min(1.0, max(0.0, (bits - SURPRISE_LOW) / (SURPRISE_HIGH - SURPRISE_LOW)))
+
+
+def numerals_of(events: Sequence[ChordEvent], key: Key) -> list[str]:
+    """Chord events -> the reduced statistics vocabulary (durations ignored)."""
+    return [
         numeral(CorpusChord(e.chord.root, family_of_quality(e.chord.quality)), key) for e in events
     ]
+
+
+def reduce_numerals(numerals: str, key: Key) -> list[str]:
+    """Library numerals (with sevenths, durations) -> the reduced statistics vocabulary."""
+    reduced = numerals_of(library.realize(numerals, key), key)
     return _merge_repeats(reduced) if len(reduced) > 1 else reduced
 
 

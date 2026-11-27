@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import DbSession, get_or_404
@@ -19,8 +19,10 @@ from app.core.harmony import (
     roman_numeral,
     suggest_next,
 )
+from app.core.harmony_stats import HarmonyStats, numerals_of, surprise_level
 from app.core.library import LibraryProgression
 from app.core.model import ChordSlot, Key, Mode
+from app.core.operators import OPERATORS, transform
 from app.core.progression import (
     ChordEvent,
     chord_timeline,
@@ -58,6 +60,8 @@ class ProgressionOut(BaseModel):
     numerals: str  # same rhythm, roman numerals
     moods: list[str]
     energy: float
+    surprise: float  # bits per chord change (see core.harmony_stats)
+    surprise_level: float  # 0 idiomatic .. 1 very unusual
 
 
 class SuggestRequest(BaseModel):
@@ -94,11 +98,15 @@ class NextChordOut(ChordOut):
 class ParseRequest(BaseModel):
     project_id: int
     text: str = Field(max_length=4000)
+    section_id: int | None = None  # for the surprise of the section's kind
 
 
 class ParseOut(BaseModel):
     chord_text: str
+    numerals: str
     events: list[EventOut]
+    surprise: float
+    surprise_level: float
 
 
 def chord_out(chord: ChordSlot, key: Key) -> dict[str, Any]:
@@ -121,17 +129,64 @@ def events_out(events: list[ChordEvent], key: Key, ts: TimeSignature) -> list[di
     return [{**chord_out(e.chord, key), "beats": e.beats or ts.numerator} for e in events]
 
 
-def progression_out(
-    source: LibraryProgression, events: list[ChordEvent], key: Key, ts: TimeSignature
+def stats_of(request: Request) -> HarmonyStats:
+    """Corpus statistics when imported, else the library's (`app.corpus.CorpusStore`)."""
+    stats: HarmonyStats = request.app.state.corpus.stats()
+    return stats
+
+
+def described(
+    events: list[ChordEvent],
+    key: Key,
+    ts: TimeSignature,
+    stats: HarmonyStats,
+    kind: str,
+    genre: str,
 ) -> dict[str, Any]:
+    """Events as the UI needs them: chords, text, numerals and surprise."""
+    bits = stats.surprise(key.mode, kind, genre, numerals_of(events, key))
     return {
-        "id": source.id,
         "chords": events_out(events, key, ts),
         "chord_text": progression_text(events, key, ts),
         "numerals": progression_text(events, key, ts, namer=lambda c: roman_numeral(c, key)),
+        "surprise": round(bits, 3),
+        "surprise_level": round(surprise_level(bits), 3),
+    }
+
+
+def progression_out(
+    source: LibraryProgression,
+    events: list[ChordEvent],
+    key: Key,
+    ts: TimeSignature,
+    stats: HarmonyStats,
+    kind: str,
+    genre: str,
+) -> dict[str, Any]:
+    return {
+        "id": source.id,
+        **described(events, key, ts, stats, kind, genre),
         "moods": sorted(source.moods),
         "energy": source.energy,
     }
+
+
+def section_of(db: Any, project: Project, section_id: int | None) -> Section | None:
+    if section_id is None:
+        return None
+    section = get_or_404(db, Section, section_id)
+    if section.project_id != project.id:
+        raise HTTPException(422, "section belongs to another project")
+    return section
+
+
+def resolve_kind(section_kind: str | None, section: Section | None) -> str:
+    if section_kind is not None:
+        kind = normalize_kind(section_kind)
+        if kind and kind not in SECTION_KINDS:
+            raise HTTPException(422, f"section_kind must be one of {', '.join(SECTION_KINDS)}")
+        return kind
+    return kind_from_name(section.name) if section else ""
 
 
 @router.get("/diatonic", response_model=list[ChordOut])
@@ -143,26 +198,20 @@ def diatonic(
 
 
 @router.post("/suggest", response_model=SuggestOut)
-def suggest(body: SuggestRequest, db: DbSession) -> dict[str, Any]:
+def suggest(body: SuggestRequest, db: DbSession, request: Request) -> dict[str, Any]:
     project = get_or_404(db, Project, body.project_id)
-    section = None
-    if body.section_id is not None:
-        section = get_or_404(db, Section, body.section_id)
-        if section.project_id != project.id:
-            raise HTTPException(422, "section belongs to another project")
-    if body.section_kind is not None:
-        kind = normalize_kind(body.section_kind)
-        if kind and kind not in SECTION_KINDS:
-            raise HTTPException(422, f"section_kind must be one of {', '.join(SECTION_KINDS)}")
-    else:
-        kind = kind_from_name(section.name) if section else ""
+    section = section_of(db, project, body.section_id)
+    kind = resolve_kind(body.section_kind, section)
     bars = body.bars or (section.bars if section else 4)
-    key = project_key(project)
-    ts = project_ts(project)
+    key, ts = project_key(project), project_ts(project)
+    genre = project.genre.strip().lower()
+    stats = stats_of(request)
     found = planner.suggest_progressions(key, project.genre, kind, bars, body.n, body.moods, ts)
     return {
         "section_kind": kind,
-        "progressions": [progression_out(p.source, p.events, key, ts) for p in found],
+        "progressions": [
+            progression_out(p.source, p.events, key, ts, stats, kind, genre) for p in found
+        ],
     }
 
 
@@ -178,19 +227,20 @@ def next_chords(body: NextRequest, db: DbSession) -> list[dict[str, Any]]:
 
 
 @router.post("/parse", response_model=ParseOut)
-def parse(body: ParseRequest, db: DbSession) -> dict[str, Any]:
-    """Validate progression text (core.progression syntax) and return its canonical form."""
+def parse(body: ParseRequest, db: DbSession, request: Request) -> dict[str, Any]:
+    """Validate progression text (core.progression syntax): canonical form, numerals, surprise."""
     project = get_or_404(db, Project, body.project_id)
+    section = section_of(db, project, body.section_id)
     ts = project_ts(project)
     try:
         events = parse_progression(body.text, ts)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     key = project_key(project)
-    return {
-        "chord_text": progression_text(events, key, ts),
-        "events": events_out(events, key, ts),
-    }
+    kind = resolve_kind(None, section)
+    out = described(events, key, ts, stats_of(request), kind, project.genre.strip().lower())
+    out["events"] = out.pop("chords")
+    return out
 
 
 # ---- Audition ---------------------------------------------------------------------------
@@ -343,3 +393,85 @@ def apply_kit(body: KitApply, db: DbSession) -> ProjectOut:
     db.commit()
     db.refresh(project)
     return project_out(project)
+
+
+# ---- Explorer: generator and operators --------------------------------------------------
+
+
+class ExploreRequest(BaseModel):
+    project_id: int
+    section_id: int | None = None
+    section_kind: str | None = None
+    length: int = Field(default=4, ge=2, le=16)  # chords, one bar each
+    audacity: float = Field(default=0.3, ge=0, le=1)
+    seed: int = Field(default=0, ge=0, lt=2**31)
+    n: int = Field(default=6, ge=1, le=12)
+
+
+class ExploredOut(BaseModel):
+    chords: list[EventOut]
+    chord_text: str
+    numerals: str
+    surprise: float
+    surprise_level: float
+
+
+class ExploreOut(BaseModel):
+    source: str  # "chordonomicon" or "library"
+    section_kind: str
+    progressions: list[ExploredOut]
+
+
+@router.post("/explore", response_model=ExploreOut)
+def explore(body: ExploreRequest, db: DbSession, request: Request) -> dict[str, Any]:
+    """New progressions sampled from the chord statistics; audacity 0 = idiomatic, 1 = unusual
+    but attested. Same seed, same ideas."""
+    project = get_or_404(db, Project, body.project_id)
+    kind = resolve_kind(body.section_kind, section_of(db, project, body.section_id))
+    key, ts = project_key(project), project_ts(project)
+    genre = project.genre.strip().lower()
+    stats = stats_of(request)
+    found = stats.generate(key.mode, kind, genre, body.length, body.audacity, body.seed, body.n)
+    return {
+        "source": stats.source,
+        "section_kind": kind,
+        "progressions": [
+            described(library.realize(" ".join(seq), key, ts), key, ts, stats, kind, genre)
+            for seq, _ in found
+        ],
+    }
+
+
+class OperatorOut(BaseModel):
+    id: str
+    scope: str
+
+
+@router.get("/operators", response_model=list[OperatorOut])
+def operators() -> list[dict[str, str]]:
+    return [{"id": op.id, "scope": op.scope} for op in OPERATORS.values()]
+
+
+class TransformRequest(BaseModel):
+    project_id: int
+    section_id: int | None = None
+    text: str = Field(min_length=1, max_length=4000)
+    operator: str
+    index: int = Field(default=0, ge=0)  # the chord a chord operator acts on
+
+
+@router.post("/transform", response_model=ExploredOut)
+def transform_progression(
+    body: TransformRequest, db: DbSession, request: Request
+) -> dict[str, Any]:
+    """Apply one operator (`GET /harmony/operators`); 422 when it does not apply."""
+    project = get_or_404(db, Project, body.project_id)
+    kind = resolve_kind(None, section_of(db, project, body.section_id))
+    key, ts = project_key(project), project_ts(project)
+    if body.operator not in OPERATORS:
+        raise HTTPException(404, f"operator {body.operator} not found")
+    try:
+        events = transform(body.operator, parse_progression(body.text, ts), body.index, key, ts)
+    except ValueError as exc:  # NotApplicable is a ValueError
+        raise HTTPException(422, str(exc)) from exc
+    return described(events, key, ts, stats_of(request), kind, project.genre.strip().lower())
